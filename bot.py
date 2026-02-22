@@ -121,9 +121,7 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎨 *Выставка «Небо Река»*\n\n"
-        "📍 11 марта\n\n"
-        "Четыре пространства — четыре состояния.\n"
-        "Свет, вода, запах и электричество.",
+        "📍 11 марта",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(
