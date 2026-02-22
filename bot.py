@@ -128,7 +128,7 @@ async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(
                 "🗺 Открыть карту выставки",
-                web_app=WebAppInfo(url="https://kanonirbrest.github.io/rp_bot/map/")
+                web_app=WebAppInfo(url="https://kanonirbrest.github.io/rp_bot/")
             )]
         ]),
     )
