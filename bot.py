@@ -337,12 +337,12 @@ def main():
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(CommandHandler("setphoto", cmd_setphoto))
-    app.add_handler(MessageHandler(filters.PHOTO & filters.Caption(r"(?i)/setphoto"), cmd_setphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(CommandHandler("setgif", cmd_setgif))
-    app.add_handler(MessageHandler(filters.ANIMATION & filters.Caption(r"(?i)/setgif"), cmd_setgif))
+    app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(MessageHandler(
-        (filters.PHOTO | filters.ANIMATION) & filters.Caption(r"(?i)/broadcast"),
+        (filters.PHOTO | filters.ANIMATION) & filters.CaptionRegex(r"(?i)/broadcast"),
         cmd_broadcast,
     ))
     app.add_handler(CommandHandler("exhibition", handle_exhibition))
