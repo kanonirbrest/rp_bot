@@ -325,8 +325,8 @@ def main():
         raise RuntimeError("BOT_TOKEN не задан в .env файле")
     if not config.GROUP_INVITE_LINK:
         raise RuntimeError("GROUP_INVITE_LINK не задан в .env файле")
-    if not config.DATABASE_URL:
-        raise RuntimeError("DATABASE_URL не задан в .env файле")
+    if not config.SUPABASE_URL or not config.SUPABASE_KEY:
+        raise RuntimeError("SUPABASE_URL или SUPABASE_KEY не заданы в .env файле")
 
     db.init_db()
 

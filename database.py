@@ -1,179 +1,132 @@
 import csv
 import io
 import os
-from contextlib import contextmanager
 from datetime import datetime
-from urllib.parse import urlparse, unquote
 
-import psycopg2
-import psycopg2.extras
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+_client: Client | None = None
 
 
-def _parse_url(url: str) -> dict:
-    """Парсит DATABASE_URL с поддержкой спецсимволов в пароле."""
-    # поддерживаем оба префикса: postgresql:// и postgres://
-    url = url.replace("postgresql://", "postgres://", 1)
-    parsed = urlparse(url)
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "dbname": parsed.path.lstrip("/"),
-        "user": unquote(parsed.username or ""),
-        "password": unquote(parsed.password or ""),
-        "sslmode": "require",
-    }
-
-
-@contextmanager
-def _conn():
-    conn = psycopg2.connect(**_parse_url(DATABASE_URL))
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+def _db() -> Client:
+    global _client
+    if _client is None:
+        _client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _client
 
 
 def init_db():
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id               SERIAL PRIMARY KEY,
-                    user_id          BIGINT UNIQUE NOT NULL,
-                    username         TEXT,
-                    first_name       TEXT,
-                    last_name        TEXT,
-                    phone            TEXT,
-                    joined_at        TEXT NOT NULL,
-                    giveaway_number  INTEGER UNIQUE
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    key   TEXT PRIMARY KEY,
-                    value TEXT
-                )
-            """)
     assign_missing_giveaway_numbers()
 
 
 def get_setting(key: str) -> str | None:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
-            row = cur.fetchone()
-            return row[0] if row else None
+    result = _db().table("settings").select("value").eq("key", key).execute()
+    return result.data[0]["value"] if result.data else None
 
 
 def set_setting(key: str, value: str):
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO settings (key, value) VALUES (%s, %s)
-                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                """,
-                (key, value),
-            )
+    _db().table("settings").upsert({"key": key, "value": value}).execute()
 
 
 def user_exists(user_id: int) -> bool:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM users WHERE user_id = %s", (user_id,))
-            return cur.fetchone() is not None
+    result = _db().table("users").select("user_id").eq("user_id", user_id).execute()
+    return len(result.data) > 0
 
 
-def _next_giveaway_number(cur) -> int:
-    cur.execute("SELECT MAX(giveaway_number) FROM users")
-    row = cur.fetchone()
-    return (row[0] or 0) + 1
+def _next_giveaway_number() -> int:
+    result = (
+        _db()
+        .table("users")
+        .select("giveaway_number")
+        .order("giveaway_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if result.data and result.data[0]["giveaway_number"] is not None:
+        return result.data[0]["giveaway_number"] + 1
+    return 1
 
 
 def assign_missing_giveaway_numbers():
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id FROM users WHERE giveaway_number IS NULL ORDER BY id"
-            )
-            rows = cur.fetchall()
-            for (row_id,) in rows:
-                number = _next_giveaway_number(cur)
-                cur.execute(
-                    "UPDATE users SET giveaway_number = %s WHERE id = %s",
-                    (number, row_id),
-                )
+    result = (
+        _db()
+        .table("users")
+        .select("id")
+        .is_("giveaway_number", "null")
+        .order("id")
+        .execute()
+    )
+    for row in result.data:
+        number = _next_giveaway_number()
+        _db().table("users").update({"giveaway_number": number}).eq("id", row["id"]).execute()
 
 
 def get_giveaway_number(user_id: int) -> int | None:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT giveaway_number FROM users WHERE user_id = %s", (user_id,)
-            )
-            row = cur.fetchone()
-            return row[0] if row else None
+    result = _db().table("users").select("giveaway_number").eq("user_id", user_id).execute()
+    return result.data[0]["giveaway_number"] if result.data else None
 
 
 def add_user(user_id: int, username: str, first_name: str, last_name: str):
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            number = _next_giveaway_number(cur)
-            cur.execute(
-                """
-                INSERT INTO users
-                    (user_id, username, first_name, last_name, joined_at, giveaway_number)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (user_id) DO NOTHING
-                """,
-                (user_id, username, first_name, last_name,
-                 datetime.now().isoformat(timespec="seconds"), number),
-            )
+    if user_exists(user_id):
+        return
+    number = _next_giveaway_number()
+    _db().table("users").insert({
+        "user_id": user_id,
+        "username": username,
+        "first_name": first_name,
+        "last_name": last_name,
+        "joined_at": datetime.now().isoformat(timespec="seconds"),
+        "giveaway_number": number,
+    }).execute()
 
 
 def get_all_user_ids() -> list[int]:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT user_id FROM users")
-            return [row[0] for row in cur.fetchall()]
+    result = _db().table("users").select("user_id").execute()
+    return [row["user_id"] for row in result.data]
 
 
 def save_phone(user_id: int, phone: str):
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET phone = %s WHERE user_id = %s", (phone, user_id)
-            )
+    _db().table("users").update({"phone": phone}).eq("user_id", user_id).execute()
 
 
 def get_stats() -> dict:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM users")
-            total = cur.fetchone()[0]
-            cur.execute(
-                "SELECT first_name, username, joined_at FROM users ORDER BY id DESC LIMIT 5"
-            )
-            recent = cur.fetchall()
-            return {"total": total, "recent": recent}
+    total_result = _db().table("users").select("*", count="exact").execute()
+    total = total_result.count or 0
+    recent_result = (
+        _db()
+        .table("users")
+        .select("first_name,username,joined_at")
+        .order("id", desc=True)
+        .limit(5)
+        .execute()
+    )
+    recent = [
+        (r["first_name"], r["username"], r["joined_at"])
+        for r in recent_result.data
+    ]
+    return {"total": total, "recent": recent}
 
 
 def export_csv() -> str:
-    with _conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT user_id, username, first_name, last_name, phone, joined_at FROM users ORDER BY id"
-            )
-            rows = cur.fetchall()
-
+    result = (
+        _db()
+        .table("users")
+        .select("user_id,username,first_name,last_name,phone,joined_at")
+        .order("id")
+        .execute()
+    )
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["user_id", "username", "first_name", "last_name", "phone", "joined_at"])
-    writer.writerows(rows)
+    for row in result.data:
+        writer.writerow([
+            row["user_id"], row["username"], row["first_name"],
+            row["last_name"], row["phone"], row["joined_at"],
+        ])
     return output.getvalue()
