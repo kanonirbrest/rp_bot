@@ -161,17 +161,26 @@ async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     number = db.get_giveaway_number(user.id)
-
-    await update.message.reply_animation(
-        animation="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
-        caption=(
-            "🎁 *Розыгрыш*\n\n"
-            f"Твой номер участника: *№ {number}*\n\n"
-            "Следи за объявлениями — победителя определим в прямом эфире!"
-        ),
-        parse_mode="Markdown",
-        reply_markup=main_menu_keyboard(),
+    caption = (
+        "🎁 *Розыгрыш*\n\n"
+        f"Твой номер участника: *№ {number}*\n\n"
+        "Следи за объявлениями — победителя определим в прямом эфире!"
     )
+
+    gif = db.get_setting("giveaway_gif")
+    if gif:
+        await update.message.reply_animation(
+            animation=gif,
+            caption=caption,
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        await update.message.reply_text(
+            caption,
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
 
 
 async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -187,6 +196,21 @@ async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id = update.message.photo[-1].file_id
     db.set_setting("announcement_photo", file_id)
     await update.message.reply_text("✅ Фото афиши обновлено!")
+
+
+async def cmd_setgif(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    if not update.message.animation:
+        await update.message.reply_text(
+            "Отправь GIF с командой /setgif в подписи."
+        )
+        return
+
+    file_id = update.message.animation.file_id
+    db.set_setting("giveaway_gif", file_id)
+    await update.message.reply_text("✅ GIF для розыгрыша обновлён!")
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -254,6 +278,8 @@ def main():
     app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(CommandHandler("setphoto", cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.Caption(r"(?i)/setphoto"), cmd_setphoto))
+    app.add_handler(CommandHandler("setgif", cmd_setgif))
+    app.add_handler(MessageHandler(filters.ANIMATION & filters.Caption(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(CommandHandler("exhibition", handle_exhibition))
     app.add_handler(CommandHandler("announcements", handle_announcements))
     app.add_handler(CommandHandler("discounts", handle_discounts))
