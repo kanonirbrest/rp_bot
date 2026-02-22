@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Карта выставки — Небо Река</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #f0f0f0;
+      font-family: 'Georgia', serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 40px;
+    }
+
+    header {
+      width: 100%;
+      padding: 28px 20px 18px;
+      text-align: center;
+      border-bottom: 1px solid #222;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      letter-spacing: 0.2em;
+      font-weight: normal;
+      color: #e8d5b0;
+    }
+
+    header p {
+      font-size: 0.72rem;
+      color: #666;
+      margin-top: 5px;
+      letter-spacing: 0.15em;
+    }
+
+    /* ───── Зал ───── */
+    .map-wrap {
+      width: 100%;
+      max-width: 680px;
+      padding: 28px 16px 0;
+    }
+
+    .hall {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3/2;
+      background: #141414;
+      border: 2px solid #2e2e2e;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    /* Текстура пола */
+    .hall::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Вход */
+    .entrance-gap {
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70px;
+      height: 4px;
+      background: #0d0d0d;
+    }
+
+    .entrance-arrow {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.55rem;
+      color: #555;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ───── Зона экспоната ───── */
+    .zone {
+      position: absolute;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1.5px solid #2e2e2e;
+      background: #1c1c1c;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .zone:hover,
+    .zone.active {
+      border-color: #e8d5b0;
+      background: #222018;
+      box-shadow: 0 0 18px rgba(232, 213, 176, .18);
+    }
+
+    .zone-num {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 0.6rem;
+      color: #555;
+      letter-spacing: 0.1em;
+      transition: color .2s;
+    }
+
+    .zone:hover .zone-num,
+    .zone.active .zone-num {
+      color: #e8d5b0;
+    }
+
+    .zone-icon {
+      font-size: 1.4rem;
+      opacity: .35;
+      transition: opacity .2s;
+      user-select: none;
+    }
+
+    .zone:hover .zone-icon,
+    .zone.active .zone-icon {
+      opacity: .75;
+    }
+
+    .zone-name {
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.55rem;
+      color: #666;
+      white-space: nowrap;
+      letter-spacing: 0.06em;
+      transition: color .2s;
+    }
+
+    .zone:hover .zone-name,
+    .zone.active .zone-name {
+      color: #e8d5b0;
+    }
+
+    /* ───── Инфопанель ───── */
+    .info-panel {
+      width: 100%;
+      max-width: 680px;
+      margin: 36px 16px 0;
+      padding: 22px 24px;
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 6px;
+      min-height: 110px;
+      transition: opacity .2s;
+    }
+
+    .info-placeholder {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #3a3a3a;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+    }
+
+    .info-num {
+      display: inline-block;
+      font-size: 0.65rem;
+      color: #888;
+      letter-spacing: 0.12em;
+      border: 1px solid #2e2e2e;
+      padding: 2px 10px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+
+    .info-title {
+      font-size: 1.05rem;
+      color: #e8d5b0;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .info-desc {
+      font-size: 0.82rem;
+      color: #999;
+      line-height: 1.75;
+      font-style: italic;
+    }
+
+    /* ───── Список ───── */
+    .list {
+      width: 100%;
+      max-width: 680px;
+      padding: 24px 16px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 420px) {
+      .list { grid-template-columns: 1fr; }
+    }
+
+    .list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #222;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+
+    .list-item:hover,
+    .list-item.active {
+      border-color: #3a3530;
+      background: #181610;
+    }
+
+    .list-num {
+      font-size: 0.7rem;
+      color: #555;
+      min-width: 16px;
+      padding-top: 1px;
+    }
+
+    .list-title {
+      font-size: 0.78rem;
+      color: #bbb;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>НЕБО РЕКА</h1>
+  <p>11 МАРТА · ПЛАН ВЫСТАВКИ</p>
+</header>
+
+<div class="map-wrap">
+  <div class="hall" id="hall">
+    <div class="entrance-gap"></div>
+    <div class="entrance-arrow">↑&nbsp;&nbsp;ВХОД</div>
+  </div>
+</div>
+
+<div class="info-panel" id="info">
+  <div class="info-placeholder">Выбери экспонат на карте</div>
+</div>
+
+<div class="list" id="list"></div>
+
+<script>
+  const exhibits = [
+    {
+      id: 1,
+      title: "Луч с управлением",
+      icon: "◈",
+      desc: "Световая инсталляция: узкий направленный луч прожектора медленно движется по пространству зала, следуя за зрителем. Датчики движения считывают положение тела — свет не отпускает, не теряет. Работа исследует, кто кем управляет: человек лучом или луч человеком.",
+      pos: { left: "10%", top: "12%", width: "28%", height: "28%" },
+    },
+    {
+      id: 2,
+      title: "Письмо вспышка",
+      icon: "✦",
+      desc: "Серия крупноформатных фотографий, сделанных в момент удара молнии над рекой. Снимки напечатаны на полупрозрачной бумаге и подсвечены сзади — каждый кадр существует долю секунды в реальности, но остаётся здесь навсегда. Текст, который не успели дочитать.",
+      pos: { right: "10%", top: "12%", width: "28%", height: "28%" },
+    },
+    {
+      id: 3,
+      title: "Сколько лаванды ты весишь",
+      icon: "⬡",
+      desc: "Интерактивный объект: весы, на одну чашу которых насыпана сухая лаванда, на другую — чистый лист бумаги. Зритель может добавлять и убирать записки с собственными словами. Запах, вес, текст — всё находится в постоянном неустойчивом равновесии.",
+      pos: { left: "10%", bottom: "18%", width: "28%", height: "26%" },
+    },
+    {
+      id: 4,
+      title: "Хождение по воде",
+      icon: "〰",
+      desc: "Видеоинсталляция: проекция поверхности реки на пол зала. Когда зритель заходит в зону проекции — рябь расходится от его ног. Тело становится камнем, брошенным в воду. Или — человеком, который верит.",
+      pos: { right: "10%", bottom: "18%", width: "28%", height: "26%" },
+    },
+  ];
+
+  const hall   = document.getElementById("hall");
+  const info   = document.getElementById("info");
+  const list   = document.getElementById("list");
+  let active   = null;
+
+  function setActive(id) {
+    const ex = exhibits.find(e => e.id === id);
+
+    // сброс
+    document.querySelectorAll(".zone, .list-item").forEach(el => el.classList.remove("active"));
+
+    if (active === id) {
+      active = null;
+      info.innerHTML = '<div class="info-placeholder">Выбери экспонат на карте</div>';
+      return;
+    }
+
+    active = id;
+    document.querySelectorAll(`[data-id="${id}"]`).forEach(el => el.classList.add("active"));
+
+    info.innerHTML = `
+      <div class="info-num">ЭКСПОНАТ ${ex.id} / ${exhibits.length}</div>
+      <div class="info-title">${ex.title}</div>
+      <div class="info-desc">${ex.desc}</div>
+    `;
+
+    info.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  exhibits.forEach(ex => {
+    // Зона на карте
+    const zone = document.createElement("div");
+    zone.className = "zone";
+    zone.dataset.id = ex.id;
+    Object.assign(zone.style, ex.pos);
+    zone.innerHTML = `
+      <div class="zone-num">${ex.id}</div>
+      <div class="zone-icon">${ex.icon}</div>
+      <div class="zone-name">${ex.title}</div>
+    `;
+    zone.addEventListener("click", () => setActive(ex.id));
+    hall.appendChild(zone);
+
+    // Элемент списка
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.dataset.id = ex.id;
+    item.innerHTML = `
+      <div class="list-num">${ex.id}</div>
+      <div class="list-title">${ex.title}</div>
+    `;
+    item.addEventListener("click", () => setActive(ex.id));
+    list.appendChild(item);
+  });
+</script>
+</body>
+</html>
