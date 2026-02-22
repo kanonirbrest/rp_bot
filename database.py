@@ -3,6 +3,7 @@ import io
 import os
 from contextlib import contextmanager
 from datetime import datetime
+from urllib.parse import urlparse, unquote
 
 import psycopg2
 import psycopg2.extras
@@ -13,9 +14,24 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 
+def _parse_url(url: str) -> dict:
+    """Парсит DATABASE_URL с поддержкой спецсимволов в пароле."""
+    # поддерживаем оба префикса: postgresql:// и postgres://
+    url = url.replace("postgresql://", "postgres://", 1)
+    parsed = urlparse(url)
+    return {
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "dbname": parsed.path.lstrip("/"),
+        "user": unquote(parsed.username or ""),
+        "password": unquote(parsed.password or ""),
+        "sslmode": "require",
+    }
+
+
 @contextmanager
 def _conn():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(**_parse_url(DATABASE_URL))
     try:
         yield conn
         conn.commit()
