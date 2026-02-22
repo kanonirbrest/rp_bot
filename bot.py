@@ -145,9 +145,16 @@ async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🎁 *Розыгрыш*\n\n"
-        "Информация о текущих розыгрышах и условия участия будут здесь.",
+    user = update.effective_user
+    number = db.get_giveaway_number(user.id)
+
+    await update.message.reply_animation(
+        animation="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+        caption=(
+            "🎁 *Розыгрыш*\n\n"
+            f"Твой номер участника: *№ {number}*\n\n"
+            "Следи за объявлениями — победителя определим в прямом эфире!"
+        ),
         parse_mode="Markdown",
         reply_markup=main_menu_keyboard(),
     )

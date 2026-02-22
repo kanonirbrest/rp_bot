@@ -8,16 +8,22 @@ def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER UNIQUE NOT NULL,
-                username    TEXT,
-                first_name  TEXT,
-                last_name   TEXT,
-                phone       TEXT,
-                joined_at   TEXT NOT NULL
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id          INTEGER UNIQUE NOT NULL,
+                username         TEXT,
+                first_name       TEXT,
+                last_name        TEXT,
+                phone            TEXT,
+                joined_at        TEXT NOT NULL,
+                giveaway_number  INTEGER UNIQUE
             )
         """)
+        # миграция для уже существующих баз без колонки giveaway_number
+        existing = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "giveaway_number" not in existing:
+            conn.execute("ALTER TABLE users ADD COLUMN giveaway_number INTEGER UNIQUE")
         conn.commit()
+    assign_missing_giveaway_numbers()
 
 
 def user_exists(user_id: int) -> bool:
@@ -28,14 +34,43 @@ def user_exists(user_id: int) -> bool:
         return row is not None
 
 
+def _next_giveaway_number(conn) -> int:
+    row = conn.execute("SELECT MAX(giveaway_number) FROM users").fetchone()
+    return (row[0] or 0) + 1
+
+
+def assign_missing_giveaway_numbers():
+    with sqlite3.connect(DB_PATH) as conn:
+        users = conn.execute(
+            "SELECT id FROM users WHERE giveaway_number IS NULL ORDER BY id"
+        ).fetchall()
+        for (row_id,) in users:
+            number = _next_giveaway_number(conn)
+            conn.execute(
+                "UPDATE users SET giveaway_number = ? WHERE id = ?", (number, row_id)
+            )
+        conn.commit()
+
+
+def get_giveaway_number(user_id: int) -> int | None:
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT giveaway_number FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return row[0] if row else None
+
+
 def add_user(user_id: int, username: str, first_name: str, last_name: str):
     with sqlite3.connect(DB_PATH) as conn:
+        number = _next_giveaway_number(conn)
         conn.execute(
             """
-            INSERT OR IGNORE INTO users (user_id, username, first_name, last_name, joined_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO users
+                (user_id, username, first_name, last_name, joined_at, giveaway_number)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (user_id, username, first_name, last_name, datetime.now().isoformat(timespec="seconds")),
+            (user_id, username, first_name, last_name,
+             datetime.now().isoformat(timespec="seconds"), number),
         )
         conn.commit()
 
