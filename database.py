@@ -96,6 +96,12 @@ def add_user(user_id: int, username: str, first_name: str, last_name: str):
         conn.commit()
 
 
+def get_all_user_ids() -> list[int]:
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("SELECT user_id FROM users").fetchall()
+        return [row[0] for row in rows]
+
+
 def save_phone(user_id: int, phone: str):
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(

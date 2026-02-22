@@ -213,6 +213,64 @@ async def cmd_setgif(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ GIF для розыгрыша обновлён!")
 
 
+async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    msg = update.message
+    user_ids = db.get_all_user_ids()
+
+    if not user_ids:
+        await msg.reply_text("Нет пользователей для рассылки.")
+        return
+
+    # определяем тип контента
+    text = " ".join(context.args) if context.args else None
+    has_photo = bool(msg.photo)
+    has_animation = bool(msg.animation)
+
+    if not text and not has_photo and not has_animation:
+        await msg.reply_text(
+            "Как использовать рассылку:\n\n"
+            "• Текст: `/broadcast Ваш текст`\n"
+            "• Фото: прикрепи фото, в подписи напиши `/broadcast текст`\n"
+            "• GIF: прикрепи гифку, в подписи напиши `/broadcast текст`",
+            parse_mode="Markdown",
+        )
+        return
+
+    caption = msg.caption.replace("/broadcast", "").strip() if msg.caption else None
+
+    status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
+
+    sent, failed = 0, 0
+    for user_id in user_ids:
+        try:
+            if has_photo:
+                await context.bot.send_photo(
+                    chat_id=user_id,
+                    photo=msg.photo[-1].file_id,
+                    caption=caption,
+                )
+            elif has_animation:
+                await context.bot.send_animation(
+                    chat_id=user_id,
+                    animation=msg.animation.file_id,
+                    caption=caption,
+                )
+            else:
+                await context.bot.send_message(chat_id=user_id, text=text)
+            sent += 1
+        except Exception:
+            failed += 1
+
+    await status.edit_text(
+        f"✅ Рассылка завершена\n\n"
+        f"Отправлено: {sent}\n"
+        f"Не доставлено: {failed} (заблокировали бота)"
+    )
+
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -280,6 +338,11 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO & filters.Caption(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(CommandHandler("setgif", cmd_setgif))
     app.add_handler(MessageHandler(filters.ANIMATION & filters.Caption(r"(?i)/setgif"), cmd_setgif))
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(MessageHandler(
+        (filters.PHOTO | filters.ANIMATION) & filters.Caption(r"(?i)/broadcast"),
+        cmd_broadcast,
+    ))
     app.add_handler(CommandHandler("exhibition", handle_exhibition))
     app.add_handler(CommandHandler("announcements", handle_announcements))
     app.add_handler(CommandHandler("discounts", handle_discounts))
