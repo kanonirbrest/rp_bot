@@ -8,6 +8,7 @@ from telegram import (
     KeyboardButton,
     ReplyKeyboardMarkup,
     Update,
+    WebAppInfo,
 )
 from telegram.ext import (
     Application,
@@ -119,11 +120,19 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎨 *Выставка*\n\n"
-        "Здесь появится информация о текущей выставке: даты, место, программа.",
+        "🎨 *Выставка «Небо Река»*\n\n"
+        "📍 11 марта\n\n"
+        "Четыре пространства — четыре состояния.\n"
+        "Свет, вода, запах и электричество.",
         parse_mode="Markdown",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "🗺 Открыть карту выставки",
+                web_app=WebAppInfo(url="https://kanonirbrest.github.io/rp_bot/map/")
+            )]
+        ]),
     )
+    await update.message.reply_text("👇", reply_markup=main_menu_keyboard())
 
 
 async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):

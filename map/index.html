@@ -2,249 +2,285 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Карта выставки — Небо Река</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --c1: #4f8ef7;   /* Луч — синий */
+      --c2: #e05cff;   /* Письмо — фиолетовый */
+      --c3: #35d4a0;   /* Лаванда — бирюзовый */
+      --c4: #ff7c3e;   /* Хождение — оранжевый */
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --border: #262626;
+      --text: #f0f0f0;
+      --muted: #777;
+    }
+
     body {
-      background: #0d0d0d;
-      color: #f0f0f0;
-      font-family: 'Georgia', serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-bottom: 40px;
+      padding-bottom: 48px;
     }
 
     header {
       width: 100%;
-      padding: 28px 20px 18px;
+      padding: 20px 20px 14px;
       text-align: center;
-      border-bottom: 1px solid #222;
+      border-bottom: 1px solid var(--border);
     }
 
     header h1 {
-      font-size: 1.4rem;
-      letter-spacing: 0.2em;
-      font-weight: normal;
-      color: #e8d5b0;
+      font-size: 1.25rem;
+      letter-spacing: 0.22em;
+      font-weight: 600;
+      background: linear-gradient(135deg, #f0c060, #e8d5b0, #fff8e8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     header p {
-      font-size: 0.72rem;
-      color: #666;
-      margin-top: 5px;
-      letter-spacing: 0.15em;
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.18em;
     }
 
-    /* ───── Зал ───── */
+    /* ─── Зал ─── */
     .map-wrap {
       width: 100%;
-      max-width: 680px;
-      padding: 28px 16px 0;
+      max-width: 640px;
+      padding: 20px 14px 0;
     }
 
     .hall {
       position: relative;
       width: 100%;
-      aspect-ratio: 3/2;
-      background: #141414;
-      border: 2px solid #2e2e2e;
-      border-radius: 6px;
+      aspect-ratio: 4/3;
+      background: #111;
+      border: 2px solid #2a2a2a;
+      border-radius: 10px;
       overflow: hidden;
     }
 
-    /* Текстура пола */
     .hall::before {
       content: '';
       position: absolute;
       inset: 0;
       background-image:
-        linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
-      background-size: 40px 40px;
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none;
     }
 
-    /* Вход */
     .entrance-gap {
       position: absolute;
       bottom: -2px;
       left: 50%;
       transform: translateX(-50%);
-      width: 70px;
+      width: 64px;
       height: 4px;
       background: #0d0d0d;
     }
 
-    .entrance-arrow {
+    .entrance-label {
       position: absolute;
-      bottom: 8px;
+      bottom: 7px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 0.55rem;
-      color: #555;
-      letter-spacing: 0.12em;
+      font-size: 0.5rem;
+      color: #444;
+      letter-spacing: 0.18em;
       white-space: nowrap;
-      text-align: center;
-      line-height: 1.6;
     }
 
-    /* ───── Зона экспоната ───── */
+    /* ─── Зоны ─── */
     .zone {
       position: absolute;
       cursor: pointer;
-      border-radius: 4px;
-      border: 1.5px solid #2e2e2e;
-      background: #1c1c1c;
-      transition: border-color .2s, background .2s, box-shadow .2s;
+      border-radius: 8px;
+      border: 2px solid #2a2a2a;
+      background: #1a1a1a;
+      transition: border-color .18s, background .18s, box-shadow .18s, transform .12s;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 4px;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    .zone:hover,
-    .zone.active {
-      border-color: #e8d5b0;
-      background: #222018;
-      box-shadow: 0 0 18px rgba(232, 213, 176, .18);
-    }
+    .zone:active { transform: scale(.96); }
 
-    .zone-num {
-      position: absolute;
-      top: 6px;
-      left: 8px;
-      font-size: 0.6rem;
-      color: #555;
-      letter-spacing: 0.1em;
-      transition: color .2s;
+    .zone[data-id="1"]:hover, .zone[data-id="1"].active {
+      border-color: var(--c1);
+      background: #0e1a2e;
+      box-shadow: 0 0 24px rgba(79,142,247,.25), inset 0 0 12px rgba(79,142,247,.08);
     }
-
-    .zone:hover .zone-num,
-    .zone.active .zone-num {
-      color: #e8d5b0;
+    .zone[data-id="2"]:hover, .zone[data-id="2"].active {
+      border-color: var(--c2);
+      background: #1c0d26;
+      box-shadow: 0 0 24px rgba(224,92,255,.25), inset 0 0 12px rgba(224,92,255,.08);
+    }
+    .zone[data-id="3"]:hover, .zone[data-id="3"].active {
+      border-color: var(--c3);
+      background: #0b1e18;
+      box-shadow: 0 0 24px rgba(53,212,160,.25), inset 0 0 12px rgba(53,212,160,.08);
+    }
+    .zone[data-id="4"]:hover, .zone[data-id="4"].active {
+      border-color: var(--c4);
+      background: #201208;
+      box-shadow: 0 0 24px rgba(255,124,62,.25), inset 0 0 12px rgba(255,124,62,.08);
     }
 
     .zone-icon {
-      font-size: 1.4rem;
-      opacity: .35;
-      transition: opacity .2s;
-      user-select: none;
+      font-size: 1.6rem;
+      line-height: 1;
+      transition: filter .18s;
+      filter: grayscale(1) opacity(.4);
     }
 
-    .zone:hover .zone-icon,
-    .zone.active .zone-icon {
-      opacity: .75;
+    .zone:hover .zone-icon, .zone.active .zone-icon {
+      filter: grayscale(0) opacity(1);
     }
 
-    .zone-name {
+    .zone-num {
+      font-size: 0.58rem;
+      color: #444;
+      letter-spacing: 0.1em;
+      transition: color .18s;
+    }
+
+    .zone:hover .zone-num, .zone.active .zone-num { color: #aaa; }
+
+    .zone-label {
       position: absolute;
-      bottom: -22px;
+      bottom: -20px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 0.55rem;
-      color: #666;
+      font-size: 0.5rem;
       white-space: nowrap;
+      color: #555;
       letter-spacing: 0.06em;
-      transition: color .2s;
+      transition: color .18s;
     }
 
-    .zone:hover .zone-name,
-    .zone.active .zone-name {
-      color: #e8d5b0;
-    }
+    .zone[data-id="1"]:hover .zone-label, .zone[data-id="1"].active .zone-label { color: var(--c1); }
+    .zone[data-id="2"]:hover .zone-label, .zone[data-id="2"].active .zone-label { color: var(--c2); }
+    .zone[data-id="3"]:hover .zone-label, .zone[data-id="3"].active .zone-label { color: var(--c3); }
+    .zone[data-id="4"]:hover .zone-label, .zone[data-id="4"].active .zone-label { color: var(--c4); }
 
-    /* ───── Инфопанель ───── */
+    /* ─── Инфопанель ─── */
     .info-panel {
       width: 100%;
-      max-width: 680px;
-      margin: 36px 16px 0;
-      padding: 22px 24px;
-      background: #141414;
-      border: 1px solid #222;
-      border-radius: 6px;
-      min-height: 110px;
-      transition: opacity .2s;
+      max-width: 640px;
+      margin: 28px 14px 0;
+      padding: 18px 20px;
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      min-height: 100px;
+      transition: border-color .2s;
     }
 
-    .info-placeholder {
-      height: 100%;
+    .info-panel.c1 { border-color: rgba(79,142,247,.4); }
+    .info-panel.c2 { border-color: rgba(224,92,255,.4); }
+    .info-panel.c3 { border-color: rgba(53,212,160,.4); }
+    .info-panel.c4 { border-color: rgba(255,124,62,.4); }
+
+    .info-empty {
+      height: 100px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #3a3a3a;
-      font-size: 0.82rem;
+      color: #333;
+      font-size: 0.8rem;
       letter-spacing: 0.06em;
     }
 
-    .info-num {
+    .info-tag {
       display: inline-block;
-      font-size: 0.65rem;
-      color: #888;
-      letter-spacing: 0.12em;
-      border: 1px solid #2e2e2e;
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
       padding: 2px 10px;
       border-radius: 20px;
       margin-bottom: 10px;
+      font-weight: 600;
     }
 
+    .c1 .info-tag { background: rgba(79,142,247,.15); color: var(--c1); }
+    .c2 .info-tag { background: rgba(224,92,255,.15); color: var(--c2); }
+    .c3 .info-tag { background: rgba(53,212,160,.15); color: var(--c3); }
+    .c4 .info-tag { background: rgba(255,124,62,.15);  color: var(--c4); }
+
     .info-title {
-      font-size: 1.05rem;
-      color: #e8d5b0;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #f0f0f0;
+      letter-spacing: 0.02em;
     }
 
     .info-desc {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       color: #999;
-      line-height: 1.75;
-      font-style: italic;
+      line-height: 1.7;
     }
 
-    /* ───── Список ───── */
+    /* ─── Список ─── */
     .list {
       width: 100%;
-      max-width: 680px;
-      padding: 24px 16px 0;
+      max-width: 640px;
+      padding: 20px 14px 0;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
 
-    @media (max-width: 420px) {
-      .list { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 380px) { .list { grid-template-columns: 1fr; } }
 
     .list-item {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 10px;
-      padding: 10px 12px;
-      border: 1px solid #222;
-      border-radius: 4px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       cursor: pointer;
-      transition: border-color .2s, background .2s;
+      transition: border-color .18s, background .18s;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    .list-item:hover,
-    .list-item.active {
-      border-color: #3a3530;
-      background: #181610;
+    .list-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
     }
 
-    .list-num {
-      font-size: 0.7rem;
-      color: #555;
-      min-width: 16px;
-      padding-top: 1px;
-    }
+    .list-item[data-id="1"] .list-dot { background: var(--c1); }
+    .list-item[data-id="2"] .list-dot { background: var(--c2); }
+    .list-item[data-id="3"] .list-dot { background: var(--c3); }
+    .list-item[data-id="4"] .list-dot { background: var(--c4); }
 
-    .list-title {
-      font-size: 0.78rem;
+    .list-item[data-id="1"]:hover, .list-item[data-id="1"].active { border-color: rgba(79,142,247,.5); background: #0e1a2e; }
+    .list-item[data-id="2"]:hover, .list-item[data-id="2"].active { border-color: rgba(224,92,255,.5); background: #1c0d26; }
+    .list-item[data-id="3"]:hover, .list-item[data-id="3"].active { border-color: rgba(53,212,160,.5); background: #0b1e18; }
+    .list-item[data-id="4"]:hover, .list-item[data-id="4"].active { border-color: rgba(255,124,62,.5); background: #201208; }
+
+    .list-text {
+      font-size: 0.75rem;
       color: #bbb;
-      line-height: 1.4;
+      line-height: 1.3;
     }
   </style>
 </head>
@@ -258,100 +294,116 @@
 <div class="map-wrap">
   <div class="hall" id="hall">
     <div class="entrance-gap"></div>
-    <div class="entrance-arrow">↑&nbsp;&nbsp;ВХОД</div>
+    <div class="entrance-label">↑ ВХОД</div>
   </div>
 </div>
 
 <div class="info-panel" id="info">
-  <div class="info-placeholder">Выбери экспонат на карте</div>
+  <div class="info-empty">Нажми на зону чтобы узнать подробнее</div>
 </div>
 
 <div class="list" id="list"></div>
 
 <script>
+  // Инициализация Telegram Mini App
+  if (window.Telegram && window.Telegram.WebApp) {
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+  }
+
   const exhibits = [
     {
       id: 1,
       title: "Луч с управлением",
-      icon: "◈",
-      desc: "Световая инсталляция: узкий направленный луч прожектора медленно движется по пространству зала, следуя за зрителем. Датчики движения считывают положение тела — свет не отпускает, не теряет. Работа исследует, кто кем управляет: человек лучом или луч человеком.",
-      pos: { left: "10%", top: "12%", width: "28%", height: "28%" },
+      icon: "🔦",
+      color: "c1",
+      tag: "ИНСТАЛЛЯЦИЯ",
+      desc: "Направленный луч прожектора следует за зрителем через датчики движения. Свет не отпускает — работа задаёт вопрос: кто управляет, а кто подчиняется?",
+      pos: { left: "8%", top: "8%", width: "36%", height: "36%" },
     },
     {
       id: 2,
       title: "Письмо вспышка",
-      icon: "✦",
-      desc: "Серия крупноформатных фотографий, сделанных в момент удара молнии над рекой. Снимки напечатаны на полупрозрачной бумаге и подсвечены сзади — каждый кадр существует долю секунды в реальности, но остаётся здесь навсегда. Текст, который не успели дочитать.",
-      pos: { right: "10%", top: "12%", width: "28%", height: "28%" },
+      icon: "⚡",
+      color: "c2",
+      tag: "ФОТОГРАФИЯ",
+      desc: "Крупноформатные снимки удара молнии над рекой, напечатанные на полупрозрачной бумаге с подсветкой сзади. Кадр, существующий долю секунды — и остающийся навсегда.",
+      pos: { right: "8%", top: "8%", width: "36%", height: "36%" },
     },
     {
       id: 3,
       title: "Сколько лаванды ты весишь",
-      icon: "⬡",
-      desc: "Интерактивный объект: весы, на одну чашу которых насыпана сухая лаванда, на другую — чистый лист бумаги. Зритель может добавлять и убирать записки с собственными словами. Запах, вес, текст — всё находится в постоянном неустойчивом равновесии.",
-      pos: { left: "10%", bottom: "18%", width: "28%", height: "26%" },
+      icon: "🌿",
+      color: "c3",
+      tag: "ОБЪЕКТ",
+      desc: "Весы: на одной чаше — сухая лаванда, на другой — чистый лист. Зритель добавляет записки с собственными словами. Запах, вес и текст в постоянном неустойчивом равновесии.",
+      pos: { left: "8%", bottom: "10%", width: "36%", height: "34%" },
     },
     {
       id: 4,
       title: "Хождение по воде",
-      icon: "〰",
-      desc: "Видеоинсталляция: проекция поверхности реки на пол зала. Когда зритель заходит в зону проекции — рябь расходится от его ног. Тело становится камнем, брошенным в воду. Или — человеком, который верит.",
-      pos: { right: "10%", bottom: "18%", width: "28%", height: "26%" },
+      icon: "🌊",
+      color: "c4",
+      tag: "ВИДЕО",
+      desc: "Проекция поверхности реки на пол зала. Когда зритель заходит в зону — рябь расходится от ног. Тело становится камнем, брошенным в воду. Или — человеком, который верит.",
+      pos: { right: "8%", bottom: "10%", width: "36%", height: "34%" },
     },
   ];
 
-  const hall   = document.getElementById("hall");
-  const info   = document.getElementById("info");
-  const list   = document.getElementById("list");
-  let active   = null;
+  const hall = document.getElementById("hall");
+  const info = document.getElementById("info");
+  const list = document.getElementById("list");
+  let active = null;
 
-  function setActive(id) {
+  function select(id) {
     const ex = exhibits.find(e => e.id === id);
-
-    // сброс
     document.querySelectorAll(".zone, .list-item").forEach(el => el.classList.remove("active"));
 
     if (active === id) {
       active = null;
-      info.innerHTML = '<div class="info-placeholder">Выбери экспонат на карте</div>';
+      info.className = "info-panel";
+      info.innerHTML = '<div class="info-empty">Нажми на зону чтобы узнать подробнее</div>';
       return;
     }
 
     active = id;
     document.querySelectorAll(`[data-id="${id}"]`).forEach(el => el.classList.add("active"));
 
+    info.className = `info-panel ${ex.color}`;
     info.innerHTML = `
-      <div class="info-num">ЭКСПОНАТ ${ex.id} / ${exhibits.length}</div>
+      <div class="info-tag">${ex.tag} · ${ex.id} / ${exhibits.length}</div>
       <div class="info-title">${ex.title}</div>
       <div class="info-desc">${ex.desc}</div>
     `;
+
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      Telegram.WebApp.HapticFeedback.impactOccurred("light");
+    }
 
     info.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   exhibits.forEach(ex => {
-    // Зона на карте
     const zone = document.createElement("div");
     zone.className = "zone";
     zone.dataset.id = ex.id;
     Object.assign(zone.style, ex.pos);
     zone.innerHTML = `
-      <div class="zone-num">${ex.id}</div>
       <div class="zone-icon">${ex.icon}</div>
-      <div class="zone-name">${ex.title}</div>
+      <div class="zone-num">${ex.id}</div>
+      <div class="zone-label">${ex.title}</div>
     `;
-    zone.addEventListener("click", () => setActive(ex.id));
+    zone.addEventListener("click", () => select(ex.id));
     hall.appendChild(zone);
 
-    // Элемент списка
     const item = document.createElement("div");
     item.className = "list-item";
     item.dataset.id = ex.id;
     item.innerHTML = `
-      <div class="list-num">${ex.id}</div>
-      <div class="list-title">${ex.title}</div>
+      <div class="list-dot"></div>
+      <div class="list-text">${ex.title}</div>
     `;
-    item.addEventListener("click", () => setActive(ex.id));
+    item.addEventListener("click", () => select(ex.id));
     list.appendChild(item);
   });
 </script>
