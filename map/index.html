@@ -143,14 +143,38 @@
     }
 
     .zone-icon {
-      font-size: 1.6rem;
-      line-height: 1;
-      transition: filter .18s;
-      filter: grayscale(1) opacity(.4);
+      width: 56px;
+      height: 56px;
+      transition: opacity .18s;
+      opacity: .35;
     }
 
-    .zone:hover .zone-icon, .zone.active .zone-icon {
-      filter: grayscale(0) opacity(1);
+    .zone:hover .zone-icon, .zone.active .zone-icon { opacity: 1; }
+
+    /* SVG анимации */
+    @keyframes beam-rotate {
+      from { transform: rotate(-30deg); }
+      to   { transform: rotate(30deg); }
+    }
+    @keyframes flash {
+      0%,100% { opacity: .9; }
+      50%      { opacity: .3; }
+    }
+    @keyframes sway {
+      0%,100% { transform: rotate(-6deg); }
+      50%      { transform: rotate(6deg); }
+    }
+    @keyframes ripple {
+      0%   { r: 4; opacity: .9; }
+      100% { r: 22; opacity: 0; }
+    }
+    @keyframes ripple2 {
+      0%   { r: 4; opacity: .7; }
+      100% { r: 18; opacity: 0; }
+    }
+    @keyframes pulse-ring {
+      0%   { r: 8;  opacity: .6; }
+      100% { r: 26; opacity: 0; }
     }
 
     .zone-num {
@@ -311,11 +335,66 @@
     Telegram.WebApp.expand();
   }
 
+  const svgs = {
+    // Луч — качающийся прожектор с лучом
+    1: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g style="transform-origin:28px 14px; animation:beam-rotate 2.4s ease-in-out infinite alternate;">
+        <rect x="24" y="8" width="8" height="10" rx="2" fill="#4f8ef7"/>
+        <polygon points="18,18 38,18 44,48 12,48" fill="#4f8ef7" opacity="0.18"/>
+        <polygon points="22,18 34,18 36,36 20,36" fill="#4f8ef7" opacity="0.35"/>
+      </g>
+      <circle cx="28" cy="50" r="3" fill="#4f8ef7" opacity="0.5">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite"/>
+      </circle>
+    </svg>`,
+
+    // Молния — вспышка с мерцанием
+    2: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g style="animation:flash 1.8s ease-in-out infinite;">
+        <polygon points="30,4 18,28 26,28 22,52 38,24 30,24" fill="#e05cff"/>
+        <polygon points="30,4 18,28 26,28 22,52 38,24 30,24" fill="#e05cff" opacity="0.3" transform="scale(1.15) translate(-4,-4)"/>
+      </g>
+      <circle cx="28" cy="28" r="20" stroke="#e05cff" stroke-width="1" opacity="0">
+        <animate attributeName="r" values="10;26" dur="1.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0" dur="1.8s" repeatCount="indefinite"/>
+      </circle>
+    </svg>`,
+
+    // Лаванда — покачивающийся стебель с листьями
+    3: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g style="transform-origin:28px 48px; animation:sway 3s ease-in-out infinite;">
+        <line x1="28" y1="48" x2="28" y2="16" stroke="#35d4a0" stroke-width="2" stroke-linecap="round"/>
+        <ellipse cx="28" cy="12" rx="5" ry="8" fill="#35d4a0" opacity="0.9"/>
+        <ellipse cx="20" cy="26" rx="4" ry="7" fill="#35d4a0" opacity="0.7" transform="rotate(-30 20 26)"/>
+        <ellipse cx="36" cy="26" rx="4" ry="7" fill="#35d4a0" opacity="0.7" transform="rotate(30 36 26)"/>
+        <ellipse cx="22" cy="36" rx="3" ry="5" fill="#35d4a0" opacity="0.5" transform="rotate(-20 22 36)"/>
+        <ellipse cx="34" cy="36" rx="3" ry="5" fill="#35d4a0" opacity="0.5" transform="rotate(20 34 36)"/>
+      </g>
+    </svg>`,
+
+    // Вода — расходящиеся круги
+    4: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="30" r="4" fill="#ff7c3e" opacity="0.9"/>
+      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1.5" fill="none">
+        <animate attributeName="r" values="4;22" dur="2s" repeatCount="indefinite" begin="0s"/>
+        <animate attributeName="opacity" values="0.9;0" dur="2s" repeatCount="indefinite" begin="0s"/>
+      </circle>
+      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1" fill="none">
+        <animate attributeName="r" values="4;18" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+        <animate attributeName="opacity" values="0.7;0" dur="2s" repeatCount="indefinite" begin="0.6s"/>
+      </circle>
+      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1" fill="none">
+        <animate attributeName="r" values="4;14" dur="2s" repeatCount="indefinite" begin="1.2s"/>
+        <animate attributeName="opacity" values="0.5;0" dur="2s" repeatCount="indefinite" begin="1.2s"/>
+      </circle>
+      <ellipse cx="28" cy="44" rx="16" ry="4" fill="#ff7c3e" opacity="0.08"/>
+    </svg>`,
+  };
+
   const exhibits = [
     {
       id: 1,
       title: "Луч с управлением",
-      icon: "🔦",
       color: "c1",
       tag: "ИНСТАЛЛЯЦИЯ",
       desc: "Направленный луч прожектора следует за зрителем через датчики движения. Свет не отпускает — работа задаёт вопрос: кто управляет, а кто подчиняется?",
@@ -324,7 +403,6 @@
     {
       id: 2,
       title: "Письмо вспышка",
-      icon: "⚡",
       color: "c2",
       tag: "ФОТОГРАФИЯ",
       desc: "Крупноформатные снимки удара молнии над рекой, напечатанные на полупрозрачной бумаге с подсветкой сзади. Кадр, существующий долю секунды — и остающийся навсегда.",
@@ -333,7 +411,6 @@
     {
       id: 3,
       title: "Сколько лаванды ты весишь",
-      icon: "🌿",
       color: "c3",
       tag: "ОБЪЕКТ",
       desc: "Весы: на одной чаше — сухая лаванда, на другой — чистый лист. Зритель добавляет записки с собственными словами. Запах, вес и текст в постоянном неустойчивом равновесии.",
@@ -342,7 +419,6 @@
     {
       id: 4,
       title: "Хождение по воде",
-      icon: "🌊",
       color: "c4",
       tag: "ВИДЕО",
       desc: "Проекция поверхности реки на пол зала. Когда зритель заходит в зону — рябь расходится от ног. Тело становится камнем, брошенным в воду. Или — человеком, который верит.",
@@ -389,7 +465,7 @@
     zone.dataset.id = ex.id;
     Object.assign(zone.style, ex.pos);
     zone.innerHTML = `
-      <div class="zone-icon">${ex.icon}</div>
+      <div class="zone-icon">${svgs[ex.id]}</div>
       <div class="zone-num">${ex.id}</div>
       <div class="zone-label">${ex.title}</div>
     `;
