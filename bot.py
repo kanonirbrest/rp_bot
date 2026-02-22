@@ -7,7 +7,6 @@ from telegram import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
     Update,
 )
 from telegram.ext import (
@@ -27,6 +26,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+MENU_EXHIBITION = "🎨 Выставка"
+MENU_ANNOUNCEMENTS = "📅 Ближайшие анонсы"
+MENU_DISCOUNTS = "🏷 Скидки"
+MENU_GIVEAWAY = "🎁 Розыгрыш"
+
+MENU_BUTTONS = [MENU_EXHIBITION, MENU_ANNOUNCEMENTS, MENU_DISCOUNTS, MENU_GIVEAWAY]
+
+
+def main_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [
+            [MENU_EXHIBITION, MENU_ANNOUNCEMENTS],
+            [MENU_DISCOUNTS, MENU_GIVEAWAY],
+        ],
+        resize_keyboard=True,
+    )
+
+
+async def send_main_menu(update: Update, text: str) -> None:
+    await update.message.reply_text(text, reply_markup=main_menu_keyboard())
+
 
 def is_admin(user_id: int) -> bool:
     return user_id in config.ADMIN_IDS
@@ -37,12 +57,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if db.user_exists(user.id):
         await update.message.reply_text(
-            f"👋 С возвращением, {user.first_name}!\n"
-            "Ты уже зарегистрирован. Используй кнопку ниже, чтобы войти в группу.",
+            f"👋 С возвращением, {user.first_name}!\n\n"
+            "Вступай в нашу группу:",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
             ]),
         )
+        await send_main_menu(update, "Выбери раздел 👇")
         return
 
     db.add_user(
@@ -79,26 +100,56 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "✅ Номер сохранён, спасибо!\n\nВступай в нашу группу:",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await update.message.reply_text(
-        "👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
         ]),
     )
+    await send_main_menu(update, "Выбери раздел 👇")
 
 
 async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Хорошо, пропустим. Вступай в группу:",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await update.message.reply_text(
-        "👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
         ]),
+    )
+    await send_main_menu(update, "Выбери раздел 👇")
+
+
+async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🎨 *Выставка*\n\n"
+        "Здесь появится информация о текущей выставке: даты, место, программа.",
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📅 *Ближайшие анонсы*\n\n"
+        "Следи за новыми событиями — скоро здесь будут анонсы мероприятий.",
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🏷 *Скидки*\n\n"
+        "Актуальные скидки и специальные предложения появятся здесь.",
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🎁 *Розыгрыш*\n\n"
+        "Информация о текущих розыгрышах и условия участия будут здесь.",
+        parse_mode="Markdown",
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -167,6 +218,10 @@ def main():
     app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.Regex(r"(?i)пропустить|skip"), handle_skip))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_EXHIBITION}$"), handle_exhibition))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_ANNOUNCEMENTS}$"), handle_announcements))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_DISCOUNTS}$"), handle_discounts))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_GIVEAWAY}$"), handle_giveaway))
 
     webhook_url = config.WEBHOOK_URL
     port = int(os.environ.get("PORT", 8443))
