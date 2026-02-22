@@ -127,12 +127,26 @@ async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    text = (
         "📅 *Ближайшие анонсы*\n\n"
-        "Следи за новыми событиями — скоро здесь будут анонсы мероприятий.",
-        parse_mode="Markdown",
-        reply_markup=main_menu_keyboard(),
+        "🎨 *11 марта — Выставка «Небо река»*\n\n"
+        "Открытие выставки, которую нельзя пропустить.\n"
+        "Приходи, зови друзей!"
     )
+    photo = db.get_setting("announcement_photo")
+    if photo:
+        await update.message.reply_photo(
+            photo=photo,
+            caption=text,
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        await update.message.reply_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard(),
+        )
 
 
 async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -158,6 +172,21 @@ async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=main_menu_keyboard(),
     )
+
+
+async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    if not update.message.photo:
+        await update.message.reply_text(
+            "Отправь фото вместе с командой /setphoto (прикрепи картинку и напиши команду в подписи)."
+        )
+        return
+
+    file_id = update.message.photo[-1].file_id
+    db.set_setting("announcement_photo", file_id)
+    await update.message.reply_text("✅ Фото афиши обновлено!")
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -223,6 +252,8 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
+    app.add_handler(CommandHandler("setphoto", cmd_setphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.Caption(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(CommandHandler("exhibition", handle_exhibition))
     app.add_handler(CommandHandler("announcements", handle_announcements))
     app.add_handler(CommandHandler("discounts", handle_discounts))

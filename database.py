@@ -18,12 +18,33 @@ def init_db():
                 giveaway_number  INTEGER UNIQUE
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
         # миграция для уже существующих баз без колонки giveaway_number
         existing = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
         if "giveaway_number" not in existing:
             conn.execute("ALTER TABLE users ADD COLUMN giveaway_number INTEGER UNIQUE")
         conn.commit()
     assign_missing_giveaway_numbers()
+
+
+def get_setting(key: str) -> str | None:
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+
+def set_setting(key: str, value: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        conn.commit()
 
 
 def user_exists(user_id: int) -> bool:
