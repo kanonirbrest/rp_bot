@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -56,7 +57,7 @@ def is_admin(user_id: int) -> bool:
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    if db.user_exists(user.id):
+    if await db.user_exists(user.id):
         await update.message.reply_text(
             f"👋 С возвращением, {user.first_name}!\n\n"
             "Вступай в нашу группу:",
@@ -67,7 +68,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_main_menu(update, "Выбери раздел 👇")
         return
 
-    db.add_user(
+    await db.add_user(
         user_id=user.id,
         username=user.username,
         first_name=user.first_name,
@@ -96,7 +97,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if contact.user_id != user.id:
         return
 
-    db.save_phone(user.id, contact.phone_number)
+    await db.save_phone(user.id, contact.phone_number)
     logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
 
     await update.message.reply_text(
@@ -140,7 +141,7 @@ async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYP
         "Открытие выставки, которую нельзя пропустить.\n"
         "Приходи, зови друзей!"
     )
-    photo = db.get_setting("announcement_photo")
+    photo = await db.get_setting("announcement_photo")
     if photo:
         await update.message.reply_photo(
             photo=photo,
@@ -167,14 +168,14 @@ async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    number = db.get_giveaway_number(user.id)
+    number = await db.get_giveaway_number(user.id)
     caption = (
         "🎁 *Розыгрыш*\n\n"
         f"Твой номер участника: *№ {number}*\n\n"
         "Следи за объявлениями — победителя определим в прямом эфире!"
     )
 
-    gif = db.get_setting("giveaway_gif")
+    gif = await db.get_setting("giveaway_gif")
     if gif:
         await update.message.reply_animation(
             animation=gif,
@@ -201,7 +202,7 @@ async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     file_id = update.message.photo[-1].file_id
-    db.set_setting("announcement_photo", file_id)
+    await db.set_setting("announcement_photo", file_id)
     await update.message.reply_text("✅ Фото афиши обновлено!")
 
 
@@ -216,7 +217,7 @@ async def cmd_setgif(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     file_id = update.message.animation.file_id
-    db.set_setting("giveaway_gif", file_id)
+    await db.set_setting("giveaway_gif", file_id)
     await update.message.reply_text("✅ GIF для розыгрыша обновлён!")
 
 
@@ -225,7 +226,7 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = update.message
-    user_ids = db.get_all_user_ids()
+    user_ids = await db.get_all_user_ids()
 
     if not user_ids:
         await msg.reply_text("Нет пользователей для рассылки.")
@@ -270,6 +271,7 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent += 1
         except Exception:
             failed += 1
+        await asyncio.sleep(0.05)
 
     await status.edit_text(
         f"✅ Рассылка завершена\n\n"
@@ -282,7 +284,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
-    stats = db.get_stats()
+    stats = await db.get_stats()
     lines = [f"📊 Всего пользователей: *{stats['total']}*\n\nПоследние 5:"]
     for first_name, username, joined_at in stats["recent"]:
         uname = f"@{username}" if username else "—"
@@ -295,7 +297,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
-    csv_data = db.export_csv()
+    csv_data = await db.export_csv()
     file = io.BytesIO(csv_data.encode("utf-8"))
     file.name = "contacts.csv"
     await update.message.reply_document(document=file, filename="contacts.csv")
@@ -335,9 +337,10 @@ def main():
     if not config.SUPABASE_URL or not config.SUPABASE_KEY:
         raise RuntimeError("SUPABASE_URL или SUPABASE_KEY не заданы в .env файле")
 
-    db.init_db()
+    async def post_init(application):
+        await db.init_db()
 
-    app = Application.builder().token(config.BOT_TOKEN).build()
+    app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
