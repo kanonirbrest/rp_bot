@@ -331,8 +331,8 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not config.BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN не задан в .env файле")
-    if not config.SUPABASE_URL or not config.SUPABASE_KEY:
-        raise RuntimeError("SUPABASE_URL или SUPABASE_KEY не заданы в .env файле")
+    if not config.TURSO_URL or not config.TURSO_TOKEN:
+        raise RuntimeError("TURSO_URL или TURSO_TOKEN не заданы в .env файле")
 
     async def post_init(application):
         await db.init_db()

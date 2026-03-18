@@ -7,5 +7,5 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 GROUP_ID = int(os.getenv("GROUP_ID", "0"))
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "0").split(",") if x.strip()]
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+TURSO_URL = os.getenv("TURSO_URL", "")
+TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")

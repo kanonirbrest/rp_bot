@@ -8,140 +8,165 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+TURSO_URL = os.getenv("TURSO_URL", "")
+TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
 
-# Кеш настроек в памяти
 _settings_cache: dict[str, str | None] = {}
 
 
-def _url(table: str) -> str:
-    return f"{SUPABASE_URL}/rest/v1/{table}"
+def _arg(value):
+    if value is None:
+        return {"type": "null"}
+    elif isinstance(value, int):
+        return {"type": "integer", "value": str(value)}
+    elif isinstance(value, float):
+        return {"type": "float", "value": str(value)}
+    else:
+        return {"type": "text", "value": str(value)}
 
 
-def _headers(prefer: str = "") -> dict:
-    h = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
+async def _execute(sql: str, args=None) -> dict:
+    payload = {
+        "requests": [
+            {
+                "type": "execute",
+                "stmt": {"sql": sql, "args": [_arg(a) for a in (args or [])]},
+            },
+            {"type": "close"},
+        ]
     }
-    if prefer:
-        h["Prefer"] = prefer
-    return h
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.post(
+            f"{TURSO_URL}/v2/pipeline",
+            headers={
+                "Authorization": f"Bearer {TURSO_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+    r.raise_for_status()
+    return r.json()["results"][0]["response"]["result"]
+
+
+def _rows(result: dict) -> list[dict]:
+    cols = [c["name"] for c in result["cols"]]
+    return [
+        {cols[i]: (cell["value"] if cell["type"] != "null" else None) for i, cell in enumerate(row)}
+        for row in result["rows"]
+    ]
 
 
 async def init_db():
+    await _execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE NOT NULL,
+            username TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            phone TEXT,
+            joined_at TEXT,
+            giveaway_number INTEGER
+        )
+    """)
+    await _execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
     await assign_missing_giveaway_numbers()
 
 
 async def get_setting(key: str) -> str | None:
     if key in _settings_cache:
         return _settings_cache[key]
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        r = await client.get(_url("settings"), headers=_headers(),
-                             params={"key": f"eq.{key}", "select": "value"})
-    data = r.json()
-    value = data[0]["value"] if data else None
+    result = await _execute("SELECT value FROM settings WHERE key = ?", [key])
+    rows = _rows(result)
+    value = rows[0]["value"] if rows else None
     _settings_cache[key] = value
     return value
 
 
 async def set_setting(key: str, value: str):
     _settings_cache[key] = value
-    async with httpx.AsyncClient() as client:
-        await client.post(_url("settings"),
-                          headers=_headers("resolution=merge-duplicates"),
-                          json={"key": key, "value": value})
+    await _execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?)"
+        " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )
 
 
 async def user_exists(user_id: int) -> bool:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"), headers=_headers(),
-                             params={"user_id": f"eq.{user_id}", "select": "user_id"})
-    return len(r.json()) > 0
+    result = await _execute("SELECT user_id FROM users WHERE user_id = ?", [user_id])
+    return len(_rows(result)) > 0
 
 
-async def _next_giveaway_number(client: httpx.AsyncClient) -> int:
-    r = await client.get(_url("users"), headers=_headers(),
-                         params={"select": "giveaway_number",
-                                 "order": "giveaway_number.desc", "limit": "1"})
-    data = r.json()
-    if data and data[0]["giveaway_number"] is not None:
-        return data[0]["giveaway_number"] + 1
+async def _next_giveaway_number() -> int:
+    result = await _execute("SELECT MAX(giveaway_number) as max_num FROM users")
+    rows = _rows(result)
+    if rows and rows[0]["max_num"] is not None:
+        return int(rows[0]["max_num"]) + 1
     return 1
 
 
 async def assign_missing_giveaway_numbers():
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"), headers=_headers(),
-                             params={"select": "id", "giveaway_number": "is.null", "order": "id"})
-        for row in r.json():
-            number = await _next_giveaway_number(client)
-            await client.patch(_url("users"), headers=_headers("return=minimal"),
-                               params={"id": f"eq.{row['id']}"},
-                               json={"giveaway_number": number})
+    result = await _execute("SELECT id FROM users WHERE giveaway_number IS NULL ORDER BY id")
+    for row in _rows(result):
+        number = await _next_giveaway_number()
+        await _execute("UPDATE users SET giveaway_number = ? WHERE id = ?", [number, int(row["id"])])
 
 
 async def get_giveaway_number(user_id: int) -> int | None:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"), headers=_headers(),
-                             params={"user_id": f"eq.{user_id}", "select": "giveaway_number"})
-    data = r.json()
-    return data[0]["giveaway_number"] if data else None
+    result = await _execute("SELECT giveaway_number FROM users WHERE user_id = ?", [user_id])
+    rows = _rows(result)
+    val = rows[0]["giveaway_number"] if rows else None
+    return int(val) if val is not None else None
 
 
 async def add_user(user_id: int, username: str, first_name: str, last_name: str):
-    async with httpx.AsyncClient() as client:
-        exists = await client.get(_url("users"), headers=_headers(),
-                                  params={"user_id": f"eq.{user_id}", "select": "user_id"})
-        if exists.json():
-            return
-        number = await _next_giveaway_number(client)
-        await client.post(_url("users"), headers=_headers("return=minimal"),
-                          json={"user_id": user_id, "username": username,
-                                "first_name": first_name, "last_name": last_name,
-                                "joined_at": datetime.now().isoformat(timespec="seconds"),
-                                "giveaway_number": number})
+    if await user_exists(user_id):
+        return
+    number = await _next_giveaway_number()
+    await _execute(
+        "INSERT INTO users (user_id, username, first_name, last_name, joined_at, giveaway_number)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        [user_id, username, first_name, last_name,
+         datetime.now().isoformat(timespec="seconds"), number],
+    )
 
 
 async def get_all_user_ids() -> list[int]:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"), headers=_headers(), params={"select": "user_id"})
-    return [row["user_id"] for row in r.json()]
+    result = await _execute("SELECT user_id FROM users")
+    return [int(row["user_id"]) for row in _rows(result)]
 
 
 async def save_phone(user_id: int, phone: str):
-    async with httpx.AsyncClient() as client:
-        await client.patch(_url("users"), headers=_headers("return=minimal"),
-                           params={"user_id": f"eq.{user_id}"},
-                           json={"phone": phone})
+    await _execute("UPDATE users SET phone = ? WHERE user_id = ?", [phone, user_id])
 
 
 async def get_stats() -> dict:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"),
-                             headers={**_headers(), "Prefer": "count=exact"},
-                             params={"select": "*"})
-        content_range = r.headers.get("content-range", "0/0")
-        total = int(content_range.split("/")[-1]) if "/" in content_range else 0
+    count_result = await _execute("SELECT COUNT(*) as total FROM users")
+    total = int(_rows(count_result)[0]["total"])
 
-        r2 = await client.get(_url("users"), headers=_headers(),
-                               params={"select": "first_name,username,joined_at",
-                                       "order": "id.desc", "limit": "5"})
-    recent = [(row["first_name"], row["username"], row["joined_at"])
-              for row in r2.json()]
+    recent_result = await _execute(
+        "SELECT first_name, username, joined_at FROM users ORDER BY id DESC LIMIT 5"
+    )
+    recent = [
+        (row["first_name"], row["username"], row["joined_at"])
+        for row in _rows(recent_result)
+    ]
     return {"total": total, "recent": recent}
 
 
 async def export_csv() -> str:
-    async with httpx.AsyncClient() as client:
-        r = await client.get(_url("users"), headers=_headers(),
-                             params={"select": "user_id,username,first_name,last_name,phone,joined_at",
-                                     "order": "id"})
+    result = await _execute(
+        "SELECT user_id, username, first_name, last_name, phone, joined_at FROM users ORDER BY id"
+    )
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["user_id", "username", "first_name", "last_name", "phone", "joined_at"])
-    for row in r.json():
+    for row in _rows(result):
         writer.writerow([row["user_id"], row["username"], row["first_name"],
                          row["last_name"], row["phone"], row["joined_at"]])
     return output.getvalue()
