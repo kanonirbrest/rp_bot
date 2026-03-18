@@ -357,7 +357,8 @@ async def cmd_qrzone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Номер локации: 1, 2, 3 или 4")
             return
 
-        url = f"{MAP_BASE_URL}?zone={zone_id}"
+        bot_username = (await context.bot.get_me()).username
+        url = f"https://t.me/{bot_username}/map?startapp={zone_id}"
         img = qrcode.make(url)
         buf = io.BytesIO()
         img.save(buf, format="PNG")

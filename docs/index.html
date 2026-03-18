@@ -459,8 +459,9 @@
     info.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  // Auto-open zone from URL param ?zone=1
-  const urlZone = parseInt(new URLSearchParams(window.location.search).get("zone"));
+  // Auto-open zone: from Telegram startapp param or URL ?zone=
+  const tgStartParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+  const urlZone = parseInt(tgStartParam || new URLSearchParams(window.location.search).get("zone"));
 
   exhibits.forEach(ex => {
     const zone = document.createElement("div");
