@@ -123,10 +123,10 @@ async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📅 *Ближайшие анонсы*\n\n"
-        "🎨 *11 марта — Выставка «Небо река»*\n\n"
-        "Открытие выставки, которую нельзя пропустить\\.\n"
-        "Приходи, зови друзей\\!"
+        "📅 Ближайшие анонсы\n\n"
+        "🎨 11 марта — Выставка «Небо река»\n\n"
+        "Открытие выставки, которую нельзя пропустить.\n"
+        "Приходи, зови друзей!"
     )
     try:
         photo = await db.get_setting("announcement_photo")
@@ -136,22 +136,19 @@ async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_photo(
             photo=photo,
             caption=text,
-            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
     else:
         await update.message.reply_text(
             text,
-            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
 
 
 async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🏷 *Скидки*\n\n"
+        "🏷 Скидки\n\n"
         "Актуальные скидки и специальные предложения появятся здесь.",
-        parse_mode="Markdown",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -167,27 +164,25 @@ async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if number:
         caption = (
-            "🎁 *Розыгрыш*\n\n"
-            f"Твой номер участника: *№ {number}*\n\n"
-            "Следи за объявлениями — победителя определим в прямом эфире\\!"
+            "🎁 Розыгрыш\n\n"
+            f"Твой номер участника: № {number}\n\n"
+            "Следи за объявлениями — победителя определим в прямом эфире!"
         )
     else:
         caption = (
-            "🎁 *Розыгрыш*\n\n"
-            "Информация о текущих розыгрышах и условия участия будут здесь\\."
+            "🎁 Розыгрыш\n\n"
+            "Информация о текущих розыгрышах и условия участия будут здесь."
         )
 
     if gif:
         await update.message.reply_animation(
             animation=gif,
             caption=caption,
-            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
     else:
         await update.message.reply_text(
             caption,
-            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
 
