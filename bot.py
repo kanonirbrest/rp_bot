@@ -108,9 +108,8 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎨 *Выставка «Небо Река»*\n\n"
+        "🎨 Выставка «Небо Река»\n\n"
         "📍 11 марта",
-        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(
                 "🗺 Открыть карту выставки",
@@ -118,7 +117,6 @@ async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )]
         ]),
     )
-    await update.message.reply_text("👇", reply_markup=main_menu_keyboard())
 
 
 async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
