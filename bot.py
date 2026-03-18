@@ -126,21 +126,24 @@ async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYP
     text = (
         "📅 *Ближайшие анонсы*\n\n"
         "🎨 *11 марта — Выставка «Небо река»*\n\n"
-        "Открытие выставки, которую нельзя пропустить.\n"
-        "Приходи, зови друзей!"
+        "Открытие выставки, которую нельзя пропустить\\.\n"
+        "Приходи, зови друзей\\!"
     )
-    photo = await db.get_setting("announcement_photo")
+    try:
+        photo = await db.get_setting("announcement_photo")
+    except Exception:
+        photo = None
     if photo:
         await update.message.reply_photo(
             photo=photo,
             caption=text,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
     else:
         await update.message.reply_text(
             text,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
 
@@ -156,25 +159,36 @@ async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    number = await db.get_giveaway_number(user.id)
-    caption = (
-        "🎁 *Розыгрыш*\n\n"
-        f"Твой номер участника: *№ {number}*\n\n"
-        "Следи за объявлениями — победителя определим в прямом эфире!"
-    )
+    try:
+        number = await db.get_giveaway_number(user.id)
+        gif = await db.get_setting("giveaway_gif")
+    except Exception:
+        number = None
+        gif = None
 
-    gif = await db.get_setting("giveaway_gif")
+    if number:
+        caption = (
+            "🎁 *Розыгрыш*\n\n"
+            f"Твой номер участника: *№ {number}*\n\n"
+            "Следи за объявлениями — победителя определим в прямом эфире\\!"
+        )
+    else:
+        caption = (
+            "🎁 *Розыгрыш*\n\n"
+            "Информация о текущих розыгрышах и условия участия будут здесь\\."
+        )
+
     if gif:
         await update.message.reply_animation(
             animation=gif,
             caption=caption,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
     else:
         await update.message.reply_text(
             caption,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
         )
 
@@ -326,7 +340,11 @@ def main():
     async def post_init(application):
         await db.init_db()
 
+    async def error_handler(update, context):
+        logger.error("Ошибка при обработке обновления: %s", context.error, exc_info=context.error)
+
     app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
+    app.add_error_handler(error_handler)
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
