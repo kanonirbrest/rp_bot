@@ -460,6 +460,10 @@
   }
 
   // Auto-open zone: from Telegram startapp param or URL ?zone=
+  if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+  }
   const tgStartParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
   const urlZone = parseInt(tgStartParam || new URLSearchParams(window.location.search).get("zone"));
 
@@ -488,7 +492,10 @@
   });
 
   if (urlZone >= 1 && urlZone <= exhibits.length) {
-    setTimeout(() => select(urlZone), 300);
+    setTimeout(() => {
+      select(urlZone);
+      document.getElementById("info")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 600);
   }
 </script>
 </body>
