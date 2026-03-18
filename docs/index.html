@@ -459,6 +459,9 @@
     info.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  // Auto-open zone from URL param ?zone=1
+  const urlZone = parseInt(new URLSearchParams(window.location.search).get("zone"));
+
   exhibits.forEach(ex => {
     const zone = document.createElement("div");
     zone.className = "zone";
@@ -482,6 +485,10 @@
     item.addEventListener("click", () => select(ex.id));
     list.appendChild(item);
   });
+
+  if (urlZone >= 1 && urlZone <= exhibits.length) {
+    setTimeout(() => select(urlZone), 300);
+  }
 </script>
 </body>
 </html>

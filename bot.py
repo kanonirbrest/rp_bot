@@ -328,6 +328,51 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+ZONE_NAMES = {
+    1: "Луч с управлением",
+    2: "Письмо вспышка",
+    3: "Сколько лаванды ты весишь",
+    4: "Хождение по воде",
+}
+
+MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
+
+
+async def cmd_qrzone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    try:
+        import qrcode
+
+        if not context.args or not context.args[0].isdigit():
+            zones = "\n".join(f"{k} — {v}" for k, v in ZONE_NAMES.items())
+            await update.message.reply_text(
+                f"Использование: /qrzone <номер>\n\nЛокации:\n{zones}"
+            )
+            return
+
+        zone_id = int(context.args[0])
+        if zone_id not in ZONE_NAMES:
+            await update.message.reply_text("Номер локации: 1, 2, 3 или 4")
+            return
+
+        url = f"{MAP_BASE_URL}?zone={zone_id}"
+        img = qrcode.make(url)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+
+        await update.message.reply_photo(
+            photo=buf,
+            caption=f"📍 Локация {zone_id}: {ZONE_NAMES[zone_id]}\n\n{url}",
+        )
+    except ImportError:
+        await update.message.reply_text(
+            "Установи пакет: pip install qrcode[pil]"
+        )
+
+
 def main():
     if not config.BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN не задан в .env файле")
@@ -347,6 +392,7 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
+    app.add_handler(CommandHandler("qrzone", cmd_qrzone))
     app.add_handler(CommandHandler("setphoto", cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(CommandHandler("setgif", cmd_setgif))
