@@ -58,14 +58,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if await db.user_exists(user.id):
-        await update.message.reply_text(
-            f"👋 С возвращением, {user.first_name}!\n\n"
-            "Вступай в нашу группу:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
-            ]),
-        )
-        await send_main_menu(update, "Выбери раздел 👇")
+        await send_main_menu(update, f"👋 С возвращением, {user.first_name}! Выбери раздел 👇")
         return
 
     await db.add_user(
@@ -107,23 +100,11 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.save_phone(user.id, contact.phone_number)
     logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
 
-    await update.message.reply_text(
-        "✅ Номер сохранён, спасибо!\n\nВступай в нашу группу:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
-        ]),
-    )
-    await send_main_menu(update, "Выбери раздел 👇")
+    await send_main_menu(update, "✅ Номер сохранён, спасибо! Выбери раздел 👇")
 
 
 async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Хорошо, пропустим. Вступай в группу:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Войти в группу", url=config.GROUP_INVITE_LINK)]
-        ]),
-    )
-    await send_main_menu(update, "Выбери раздел 👇")
+    await send_main_menu(update, "Хорошо, пропустим. Выбери раздел 👇")
 
 
 async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -339,8 +320,6 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not config.BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN не задан в .env файле")
-    if not config.GROUP_INVITE_LINK:
-        raise RuntimeError("GROUP_INVITE_LINK не задан в .env файле")
     if not config.SUPABASE_URL or not config.SUPABASE_KEY:
         raise RuntimeError("SUPABASE_URL или SUPABASE_KEY не заданы в .env файле")
 
