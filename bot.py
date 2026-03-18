@@ -128,19 +128,23 @@ async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     try:
         photo = await db.get_setting("announcement_photo")
-    except Exception:
+    except Exception as e:
+        logger.error("get_setting announcement_photo failed: %s", e)
         photo = None
-    if photo:
-        await update.message.reply_photo(
-            photo=photo,
-            caption=text,
-            reply_markup=main_menu_keyboard(),
-        )
-    else:
-        await update.message.reply_text(
-            text,
-            reply_markup=main_menu_keyboard(),
-        )
+    try:
+        if photo:
+            await update.message.reply_photo(
+                photo=photo,
+                caption=text,
+                reply_markup=main_menu_keyboard(),
+            )
+        else:
+            await update.message.reply_text(
+                text,
+                reply_markup=main_menu_keyboard(),
+            )
+    except Exception as e:
+        logger.error("handle_announcements reply failed: %s", e)
 
 
 async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -156,7 +160,8 @@ async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         number = await db.get_giveaway_number(user.id)
         gif = await db.get_setting("giveaway_gif")
-    except Exception:
+    except Exception as e:
+        logger.error("handle_giveaway db failed: %s", e)
         number = None
         gif = None
 

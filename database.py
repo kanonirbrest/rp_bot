@@ -37,7 +37,7 @@ async def init_db():
 async def get_setting(key: str) -> str | None:
     if key in _settings_cache:
         return _settings_cache[key]
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=8.0) as client:
         r = await client.get(_url("settings"), headers=_headers(),
                              params={"key": f"eq.{key}", "select": "value"})
     data = r.json()
