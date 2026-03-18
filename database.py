@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TURSO_URL = os.getenv("TURSO_URL", "")
+TURSO_URL = os.getenv("TURSO_URL", "").replace("libsql://", "https://")
 TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
 
 _settings_cache: dict[str, str | None] = {}
