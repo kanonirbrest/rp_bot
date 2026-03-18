@@ -78,14 +78,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         one_time_keyboard=True,
     )
     await update.message.reply_text(
-        f"👋 Привет, *{user.first_name}*\\!\n\n"
-        "Добро пожаловать в Пространство «Небо Река»\\.\n\n"
-        "📲 *Оставь номер телефона и получи:*\n\n"
+        f"👋 Привет, {user.first_name}!\n\n"
+        "Добро пожаловать в Пространство «Небо Река».\n\n"
+        "📲 Оставь номер телефона и получи:\n\n"
         "✅ Скидки для участников\n"
         "✅ Анонсы мероприятий первым\n"
         "✅ Участие в розыгрышах\n\n"
         "👇 Нажми кнопку ниже",
-        parse_mode="MarkdownV2",
         reply_markup=keyboard,
     )
 
