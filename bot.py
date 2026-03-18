@@ -77,15 +77,22 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Новый пользователь: %s (%s)", user.full_name, user.id)
 
     keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton("📱 Поделиться номером телефона", request_contact=True)]],
+        [
+            [KeyboardButton("📱 Поделиться номером", request_contact=True)],
+            [KeyboardButton("Пропустить →")],
+        ],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
     await update.message.reply_text(
-        f"👋 Привет, {user.first_name}!\n\n"
-        "Рады видеть тебя. Мы сохранили твой контакт.\n\n"
-        "Поделись номером телефона, чтобы мы могли связаться с тобой напрямую "
-        "(или пропусти этот шаг).",
+        f"👋 Привет, *{user.first_name}*\\!\n\n"
+        "Добро пожаловать в Пространство «Небо Река»\\.\n\n"
+        "📲 *Оставь номер телефона и получи:*\n\n"
+        "✅ Скидки для участников\n"
+        "✅ Анонсы мероприятий первым\n"
+        "✅ Участие в розыгрышах\n\n"
+        "👇 Нажми кнопку ниже",
+        parse_mode="MarkdownV2",
         reply_markup=keyboard,
     )
 
