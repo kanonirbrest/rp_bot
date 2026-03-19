@@ -75,14 +75,14 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
 def main_menu_inline() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🎨 Выставка "Небо.Река"',       callback_data="cb_exhibition")],
+        [InlineKeyboardButton("🗺 Карта выставки",              web_app=WebAppInfo(url=MAP_BASE_URL))],
         [InlineKeyboardButton("💝 Специальные предложения",     callback_data="cb_offers")],
         [InlineKeyboardButton("📅 Ближайшие анонсы",            callback_data="cb_announcements")],
         [InlineKeyboardButton("🎁 Подарочные сертификаты",      callback_data="cb_certificates")],
         [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
-        [InlineKeyboardButton("📞 Связаться с нами",             callback_data="cb_contact")],
+        [InlineKeyboardButton("📞 Связаться с нами",            callback_data="cb_contact")],
         [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
         [InlineKeyboardButton("ℹ️ О RAZMAN production",         url=ABOUT_URL)],
-        [InlineKeyboardButton("🗺 Карта выставки",              web_app=WebAppInfo(url=MAP_BASE_URL))],
     ])
 
 
