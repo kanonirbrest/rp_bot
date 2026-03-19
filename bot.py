@@ -405,6 +405,9 @@ async def cmd_map_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]),
     )
 
+async def cmd_about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_about(update.effective_message)
+
 
 # ── Inline button callbacks ────────────────────────────────────────
 async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -542,9 +545,7 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def cb_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def _send_about(message):
     text = (
         "О RAZMAN production ℹ️\n\n"
         "Razman Production — команда, которая создаёт масштабные иммерсивные арт-проекты "
@@ -560,9 +561,15 @@ async def cb_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         photo = None
     if photo:
-        await query.message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
     else:
-        await query.message.reply_text(text, reply_markup=kb)
+        await message.reply_text(text, reply_markup=kb)
+
+
+async def cb_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_about(query.message)
 
 
 # ── Review conversation ────────────────────────────────────────────
@@ -929,6 +936,7 @@ def main():
             ("certificates",  "Подарочные сертификаты 🎀"),
             ("faq",           "Часто задаваемые вопросы ❓"),
             ("map",           "Карта выставки 🗺"),
+            ("about",         "О RAZMAN production ℹ️"),
         ])
 
     async def error_handler(update, context):
@@ -981,6 +989,7 @@ def main():
     app.add_handler(CommandHandler("review",        review_start))
     app.add_handler(CommandHandler("contact",       cmd_contact_cmd))
     app.add_handler(CommandHandler("map",           cmd_map_cmd))
+    app.add_handler(CommandHandler("about",         cmd_about_cmd))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
