@@ -269,9 +269,9 @@ async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 Связаться с нами",
+        f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -316,9 +316,9 @@ async def _send_announcements(message):
         photo = None
     try:
         if photo:
-            await message.reply_photo(photo=photo, caption=text, reply_markup=_map_kb())
+            await message.reply_photo(photo=photo, caption=text)
         else:
-            await message.reply_text(text, reply_markup=_map_kb())
+            await message.reply_text(text)
     except Exception as e:
         logger.error("_send_announcements reply failed: %s", e)
 
@@ -337,9 +337,9 @@ async def _send_certificates(message):
     except Exception:
         photo = None
     if photo:
-        await message.reply_photo(photo=photo, caption=text, reply_markup=_map_kb())
+        await message.reply_photo(photo=photo, caption=text)
     else:
-        await message.reply_text(text, reply_markup=_map_kb())
+        await message.reply_text(text)
 
 
 async def _send_giveaway(message, user):
@@ -377,9 +377,9 @@ async def cmd_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 Связаться с нами",
+        f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -539,9 +539,9 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.message.reply_text(
-        "📞 Связаться с нами",
+        f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
