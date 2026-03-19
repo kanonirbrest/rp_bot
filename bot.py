@@ -334,18 +334,25 @@ FAQ_ANSWERS = {
 FAQ_WITH_CONTACT = {"faq_return", "faq_cantbuy"}
 
 
+FAQ_LIST_TEXT = "❓ Часто задаваемые вопросы\n\nВыбери вопрос:"
+
+FAQ_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🎟 Где и как купить билет",     callback_data="faq_buy")],
+    [InlineKeyboardButton("🔄 Вернуть / обменять билет",  callback_data="faq_return")],
+    [InlineKeyboardButton("📧 Билеты не пришли на почту", callback_data="faq_notreceived")],
+    [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
+    [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
+    [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
+])
+
+
 async def cb_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟 Где и как купить билет",     callback_data="faq_buy")],
-        [InlineKeyboardButton("🔄 Вернуть / обменять билет",  callback_data="faq_return")],
-        [InlineKeyboardButton("📧 Билеты не пришли на почту", callback_data="faq_notreceived")],
-        [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
-        [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
-        [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
-    ])
-    await query.message.reply_text("❓ Часто задаваемые вопросы\n\nВыбери вопрос:", reply_markup=kb)
+    try:
+        await query.edit_message_text(FAQ_LIST_TEXT, reply_markup=FAQ_KB)
+    except Exception:
+        await query.message.reply_text(FAQ_LIST_TEXT, reply_markup=FAQ_KB)
 
 
 async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -359,7 +366,10 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}"),
         ])
-    await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    try:
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    except Exception:
+        await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def cb_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
