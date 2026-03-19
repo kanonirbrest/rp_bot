@@ -609,6 +609,8 @@ async def review_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📍 Отзыв на Яндекс Картах", url=YANDEX_URL)]
             ]),
         )
+        await query.message.reply_text("Введите текст отзыва:")
+        return ENTER_TEXT
 
     await query.message.reply_text(
         "Оставьте свой контактный e-mail (по желанию, если нужно связаться для уточнений).\n\n"
