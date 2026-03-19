@@ -3,22 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Карта выставки — Небо Река</title>
+  <title>Карта — Небо.Река</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --c1: #4f8ef7;   /* Луч — синий */
-      --c2: #e05cff;   /* Письмо — фиолетовый */
-      --c3: #35d4a0;   /* Лаванда — бирюзовый */
-      --c4: #ff7c3e;   /* Хождение — оранжевый */
-      --bg: #0d0d0d;
+      --c1: #4f8ef7;
+      --c2: #c070ff;
+      --c3: #35d4a0;
+      --c4: #ff7c3e;
+      --c5: #ff4f9e;
+      --c6: #f0c060;
+      --bg:      #0d0d0d;
       --surface: #161616;
-      --border: #262626;
-      --text: #f0f0f0;
-      --muted: #777;
+      --border:  #262626;
+      --text:    #f0f0f0;
+      --muted:   #666;
     }
+
+    @keyframes spin      { from { transform:rotate(0deg) }   to { transform:rotate(360deg) } }
+    @keyframes sway      { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(8deg)} }
+    @keyframes beam-rock { 0%,100%{transform:rotate(-15deg)} 50%{transform:rotate(15deg)} }
+    @keyframes bob       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+    @keyframes pulse     { 0%,100%{opacity:.9} 50%{opacity:.3} }
 
     body {
       background: var(--bg);
@@ -28,475 +36,783 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-bottom: 48px;
+      padding-bottom: 60px;
     }
 
+    /* ── Header ── */
     header {
       width: 100%;
-      padding: 20px 20px 14px;
+      padding: 18px 20px 10px;
       text-align: center;
       border-bottom: 1px solid var(--border);
     }
-
     header h1 {
-      font-size: 1.25rem;
-      letter-spacing: 0.22em;
-      font-weight: 600;
+      font-size: 1.2rem;
+      letter-spacing: .25em;
+      font-weight: 700;
       background: linear-gradient(135deg, #f0c060, #e8d5b0, #fff8e8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-
     header p {
-      font-size: 0.68rem;
+      font-size: .6rem;
       color: var(--muted);
       margin-top: 4px;
-      letter-spacing: 0.18em;
+      letter-spacing: .18em;
     }
 
-    /* ─── Зал ─── */
-    .map-wrap {
+    /* ── Map ── */
+    .map-hint {
+      font-size: .58rem;
+      color: #383838;
+      letter-spacing: .14em;
+      margin: 10px 0 4px;
+      text-align: center;
+    }
+    .map-outer {
       width: 100%;
-      max-width: 640px;
-      padding: 20px 14px 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 0 6px;
+      scrollbar-width: none;
     }
-
-    .hall {
+    .map-outer::-webkit-scrollbar { display: none; }
+    .map-inner {
       position: relative;
+      width: 820px;
+      height: 288px;
+      margin: 0 14px;
+    }
+    .floor-svg {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      aspect-ratio: 4/3;
-      background: #111;
-      border: 2px solid #2a2a2a;
+      height: 100%;
+    }
+    .dots-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* ── Zone dot ── */
+    .zdot {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1.5px solid currentColor;
+      background: rgba(0,0,0,.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .56rem;
+      font-weight: 700;
+      cursor: pointer;
+      transform: translate(-50%,-50%);
+      transition: transform .15s, box-shadow .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 10;
+    }
+    .zdot:active          { transform: translate(-50%,-50%) scale(1.25); }
+    .zdot.active          { transform: translate(-50%,-50%) scale(1.15); box-shadow: 0 0 12px currentColor; background: rgba(0,0,0,.85); }
+
+    /* ── Info panel ── */
+    .info-panel {
+      width: calc(100% - 28px);
+      max-width: 640px;
+      margin: 10px 0 0;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .info-empty {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+    .info-top {
+      display: flex;
+      gap: 14px;
+      padding: 14px 16px 10px;
+      align-items: flex-start;
+    }
+    .info-icon {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
       border-radius: 10px;
       overflow: hidden;
     }
+    .info-meta   { flex: 1; }
+    .info-num    { font-size: .54rem; letter-spacing: .18em; font-weight: 700; margin-bottom: 3px; }
+    .info-title  { font-size: .98rem; font-weight: 700; line-height: 1.15; margin-bottom: 4px; }
+    .info-tag    { display:inline-block; font-size:.52rem; letter-spacing:.12em; padding:2px 8px; border-radius:20px; font-weight:600; }
+    .info-desc   { padding:0 16px 10px; font-size:.75rem; color:#999; line-height:1.8; max-height:200px; overflow-y:auto; white-space:pre-wrap; }
+    .info-notes  { margin:0 16px 14px; padding:10px 12px; border-radius:8px; background:rgba(255,180,0,.05); border:1px solid rgba(255,180,0,.18); }
+    .info-notes-hd   { font-size:.6rem; font-weight:700; color:#e6a000; letter-spacing:.12em; margin-bottom:5px; }
+    .info-notes-body { font-size:.7rem; color:#aa7700; line-height:1.7; white-space:pre-wrap; }
 
-    .hall::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-      background-size: 36px 36px;
-      pointer-events: none;
+    /* ── Zone list ── */
+    .sec-title {
+      width: calc(100% - 28px);
+      max-width: 640px;
+      font-size: .58rem;
+      letter-spacing: .22em;
+      color: var(--muted);
+      margin: 18px 0 8px;
     }
-
-    .entrance-gap {
-      position: absolute;
-      bottom: -2px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 64px;
-      height: 4px;
-      background: #0d0d0d;
-    }
-
-    .entrance-label {
-      position: absolute;
-      bottom: 7px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.5rem;
-      color: #444;
-      letter-spacing: 0.18em;
-      white-space: nowrap;
-    }
-
-    /* ─── Зоны ─── */
-    .zone {
-      position: absolute;
-      cursor: pointer;
-      border-radius: 8px;
-      border: 2px solid #2a2a2a;
-      background: #1a1a1a;
-      transition: border-color .18s, background .18s, box-shadow .18s, transform .12s;
+    .zones-list {
+      width: calc(100% - 28px);
+      max-width: 640px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      -webkit-tap-highlight-color: transparent;
+      gap: 5px;
     }
-
-    .zone:active { transform: scale(.96); }
-
-    .zone[data-id="1"]:hover, .zone[data-id="1"].active {
-      border-color: var(--c1);
-      background: #0e1a2e;
-      box-shadow: 0 0 24px rgba(79,142,247,.25), inset 0 0 12px rgba(79,142,247,.08);
-    }
-    .zone[data-id="2"]:hover, .zone[data-id="2"].active {
-      border-color: var(--c2);
-      background: #1c0d26;
-      box-shadow: 0 0 24px rgba(224,92,255,.25), inset 0 0 12px rgba(224,92,255,.08);
-    }
-    .zone[data-id="3"]:hover, .zone[data-id="3"].active {
-      border-color: var(--c3);
-      background: #0b1e18;
-      box-shadow: 0 0 24px rgba(53,212,160,.25), inset 0 0 12px rgba(53,212,160,.08);
-    }
-    .zone[data-id="4"]:hover, .zone[data-id="4"].active {
-      border-color: var(--c4);
-      background: #201208;
-      box-shadow: 0 0 24px rgba(255,124,62,.25), inset 0 0 12px rgba(255,124,62,.08);
-    }
-
-    .zone-icon {
-      width: 56px;
-      height: 56px;
-      transition: opacity .18s;
-      opacity: .35;
-    }
-
-    .zone:hover .zone-icon, .zone.active .zone-icon { opacity: 1; }
-
-    /* SVG анимации */
-    @keyframes beam-rotate {
-      from { transform: rotate(-30deg); }
-      to   { transform: rotate(30deg); }
-    }
-    @keyframes flash {
-      0%,100% { opacity: .9; }
-      50%      { opacity: .3; }
-    }
-    @keyframes sway {
-      0%,100% { transform: rotate(-6deg); }
-      50%      { transform: rotate(6deg); }
-    }
-    @keyframes ripple {
-      0%   { r: 4; opacity: .9; }
-      100% { r: 22; opacity: 0; }
-    }
-    @keyframes ripple2 {
-      0%   { r: 4; opacity: .7; }
-      100% { r: 18; opacity: 0; }
-    }
-    @keyframes pulse-ring {
-      0%   { r: 8;  opacity: .6; }
-      100% { r: 26; opacity: 0; }
-    }
-
-    .zone-num {
-      font-size: 0.58rem;
-      color: #444;
-      letter-spacing: 0.1em;
-      transition: color .18s;
-    }
-
-    .zone:hover .zone-num, .zone.active .zone-num { color: #aaa; }
-
-    .zone-label {
-      position: absolute;
-      bottom: -20px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.5rem;
-      white-space: nowrap;
-      color: #555;
-      letter-spacing: 0.06em;
-      transition: color .18s;
-    }
-
-    .zone[data-id="1"]:hover .zone-label, .zone[data-id="1"].active .zone-label { color: var(--c1); }
-    .zone[data-id="2"]:hover .zone-label, .zone[data-id="2"].active .zone-label { color: var(--c2); }
-    .zone[data-id="3"]:hover .zone-label, .zone[data-id="3"].active .zone-label { color: var(--c3); }
-    .zone[data-id="4"]:hover .zone-label, .zone[data-id="4"].active .zone-label { color: var(--c4); }
-
-    /* ─── Инфопанель ─── */
-    .info-panel {
-      width: 100%;
-      max-width: 640px;
-      margin: 28px 14px 0;
-      padding: 18px 20px;
-      background: var(--surface);
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      min-height: 100px;
-      transition: border-color .2s;
-    }
-
-    .info-panel.c1 { border-color: rgba(79,142,247,.4); }
-    .info-panel.c2 { border-color: rgba(224,92,255,.4); }
-    .info-panel.c3 { border-color: rgba(53,212,160,.4); }
-    .info-panel.c4 { border-color: rgba(255,124,62,.4); }
-
-    .info-empty {
-      height: 100px;
+    .zitem {
       display: flex;
       align-items: center;
-      justify-content: center;
-      color: #333;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-    }
-
-    .info-tag {
-      display: inline-block;
-      font-size: 0.6rem;
-      letter-spacing: 0.14em;
-      padding: 2px 10px;
-      border-radius: 20px;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-
-    .c1 .info-tag { background: rgba(79,142,247,.15); color: var(--c1); }
-    .c2 .info-tag { background: rgba(224,92,255,.15); color: var(--c2); }
-    .c3 .info-tag { background: rgba(53,212,160,.15); color: var(--c3); }
-    .c4 .info-tag { background: rgba(255,124,62,.15);  color: var(--c4); }
-
-    .info-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: #f0f0f0;
-      letter-spacing: 0.02em;
-    }
-
-    .info-desc {
-      font-size: 0.8rem;
-      color: #999;
-      line-height: 1.7;
-    }
-
-    /* ─── Список ─── */
-    .list {
-      width: 100%;
-      max-width: 640px;
-      padding: 20px 14px 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    @media (max-width: 380px) { .list { grid-template-columns: 1fr; } }
-
-    .list-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
+      gap: 12px;
+      padding: 9px 14px;
       border: 1px solid var(--border);
       border-radius: 8px;
       cursor: pointer;
       transition: border-color .18s, background .18s;
       -webkit-tap-highlight-color: transparent;
     }
-
-    .list-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-      flex-shrink: 0;
+    .zitem.active          { background: rgba(255,255,255,.03); }
+    .znum {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 1.5px solid currentColor;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .58rem; font-weight: 700; flex-shrink: 0;
     }
-
-    .list-item[data-id="1"] .list-dot { background: var(--c1); }
-    .list-item[data-id="2"] .list-dot { background: var(--c2); }
-    .list-item[data-id="3"] .list-dot { background: var(--c3); }
-    .list-item[data-id="4"] .list-dot { background: var(--c4); }
-
-    .list-item[data-id="1"]:hover, .list-item[data-id="1"].active { border-color: rgba(79,142,247,.5); background: #0e1a2e; }
-    .list-item[data-id="2"]:hover, .list-item[data-id="2"].active { border-color: rgba(224,92,255,.5); background: #1c0d26; }
-    .list-item[data-id="3"]:hover, .list-item[data-id="3"].active { border-color: rgba(53,212,160,.5); background: #0b1e18; }
-    .list-item[data-id="4"]:hover, .list-item[data-id="4"].active { border-color: rgba(255,124,62,.5); background: #201208; }
-
-    .list-text {
-      font-size: 0.75rem;
-      color: #bbb;
-      line-height: 1.3;
-    }
+    .zname { font-size: .78rem; color: #bbb; line-height: 1.3; }
+    .zitem.active .zname { color: var(--text); }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>НЕБО РЕКА</h1>
-  <p>11 МАРТА · ПЛАН ВЫСТАВКИ</p>
+  <h1>НЕБО · РЕКА</h1>
+  <p>ПЛАН ВЫСТАВКИ · 23 ЗОНЫ</p>
 </header>
 
-<div class="map-wrap">
-  <div class="hall" id="hall">
-    <div class="entrance-gap"></div>
-    <div class="entrance-label">↑ ВХОД</div>
+<div class="map-hint">← прокрути карту →</div>
+
+<div class="map-outer">
+  <div class="map-inner">
+
+    <!-- ── Floor plan SVG ── -->
+    <svg class="floor-svg" viewBox="0 0 820 288" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="gr" width="38" height="38" patternUnits="userSpaceOnUse">
+          <path d="M38 0L0 0 0 38" fill="none" stroke="rgba(255,255,255,.016)" stroke-width="1"/>
+        </pattern>
+      </defs>
+
+      <!-- Main hall -->
+      <rect x="1" y="1" width="628" height="286" rx="7" fill="#0f0f0f" stroke="#252525" stroke-width="1.5"/>
+      <rect x="1" y="1" width="628" height="286" fill="url(#gr)" rx="7"/>
+
+      <!-- Entrance gap bottom -->
+      <rect x="350" y="283" width="80" height="6" fill="#0d0d0d"/>
+      <text x="390" y="275" text-anchor="middle" fill="#272727" font-size="7" font-family="Helvetica" letter-spacing="2">ВХОД ↑</text>
+
+      <!-- Greenhouse area (zone 5) -->
+      <ellipse cx="192" cy="134" rx="72" ry="56" fill="rgba(50,140,70,.03)" stroke="rgba(50,140,70,.12)" stroke-width="1" stroke-dasharray="5 3"/>
+
+      <!-- Central pool (mountain/water) -->
+      <rect x="295" y="72" width="152" height="142" rx="10" fill="rgba(40,130,180,.04)" stroke="rgba(53,180,200,.12)" stroke-width="1"/>
+      <!-- inner island -->
+      <ellipse cx="371" cy="143" rx="40" ry="32" fill="rgba(40,130,180,.05)" stroke="rgba(53,180,200,.1)" stroke-width="1" stroke-dasharray="4 3"/>
+
+      <!-- Bridge over water (zone 7) -->
+      <line x1="295" y1="220" x2="370" y2="220" stroke="rgba(192,112,255,.25)" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 3"/>
+
+      <!-- Trees -->
+      <circle cx="168" cy="120" r="24" fill="rgba(55,150,80,.05)" stroke="rgba(55,150,80,.13)" stroke-width="1"/>
+      <circle cx="200" cy="110" r="16" fill="rgba(55,150,80,.04)" stroke="rgba(55,150,80,.1)"  stroke-width="1"/>
+      <circle cx="178" cy="148" r="13" fill="rgba(55,150,80,.04)" stroke="rgba(55,150,80,.1)"  stroke-width="1"/>
+
+      <!-- Connector to right room -->
+      <rect x="628" y="108" width="22" height="72" fill="#0d0d0d" stroke="none"/>
+      <line x1="628" y1="108" x2="648" y2="108" stroke="#252525" stroke-width="1"/>
+      <line x1="628" y1="180" x2="648" y2="180" stroke="#252525" stroke-width="1"/>
+
+      <!-- Right room (globe room) -->
+      <rect x="648" y="24" width="168" height="240" rx="7" fill="#0c0c12" stroke="#252525" stroke-width="1.5"/>
+      <rect x="648" y="24" width="168" height="240" fill="url(#gr)" rx="7"/>
+      <!-- Globe/planet -->
+      <circle cx="732" cy="118" r="60" fill="rgba(30,55,110,.08)" stroke="rgba(70,110,200,.1)" stroke-width="1" stroke-dasharray="5 4"/>
+      <circle cx="732" cy="118" r="38" fill="rgba(30,55,110,.06)" stroke="rgba(70,110,200,.1)" stroke-width="1"/>
+      <!-- Water in right room -->
+      <rect x="658" y="200" width="148" height="52" rx="5" fill="rgba(53,212,160,.04)" stroke="rgba(53,212,160,.1)" stroke-width="1"/>
+
+      <!-- WC markers -->
+      <rect x="440" y="198" width="28" height="20" rx="3" fill="rgba(60,60,60,.2)" stroke="#2a2a2a" stroke-width="1"/>
+      <text x="454" y="211" text-anchor="middle" fill="#333" font-size="6" font-family="Helvetica">WC</text>
+      <rect x="476" y="198" width="28" height="20" rx="3" fill="rgba(60,60,60,.2)" stroke="#2a2a2a" stroke-width="1"/>
+      <text x="490" y="211" text-anchor="middle" fill="#333" font-size="6" font-family="Helvetica">WC</text>
+
+      <!-- Subtle area labels -->
+      <text x="52"  y="66"  text-anchor="middle" fill="#1e1e1e" font-size="6.5" font-family="Helvetica" letter-spacing="1">ВХОД</text>
+      <text x="192" y="176" text-anchor="middle" fill="#1a2a1a" font-size="6"   font-family="Helvetica" letter-spacing="1">ОРАНЖЕРЕЯ</text>
+      <text x="371" y="152" text-anchor="middle" fill="#141e28" font-size="6"   font-family="Helvetica" letter-spacing="1">ЦЕНТР</text>
+      <text x="732" y="128" text-anchor="middle" fill="#141428" font-size="6"   font-family="Helvetica" letter-spacing="1">ПЛАНЕТА</text>
+    </svg>
+
+    <!-- Zone dots (injected by JS) -->
+    <div class="dots-layer" id="dots"></div>
   </div>
 </div>
 
 <div class="info-panel" id="info">
-  <div class="info-empty">Нажми на зону чтобы узнать подробнее</div>
+  <div class="info-empty">Нажми на зону, чтобы узнать подробнее</div>
 </div>
 
-<div class="list" id="list"></div>
+<div class="sec-title">ВСЕ ЗОНЫ</div>
+<div class="zones-list" id="zlist"></div>
 
 <script>
-  // Инициализация Telegram Mini App
-  if (window.Telegram && window.Telegram.WebApp) {
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
+if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+
+/* ── SVG icons 52×52 ── */
+const ICONS = {
+  // 1. Карта состояний — rotating colored dots
+  1:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g style="transform-origin:26px 26px;animation:spin 8s linear infinite">
+      <circle cx="26" cy="9"  r="5" fill="#ff4f9e" opacity=".9"/>
+      <circle cx="43" cy="26" r="5" fill="#35d4a0" opacity=".9"/>
+      <circle cx="26" cy="43" r="5" fill="#f0c060"  opacity=".9"/>
+      <circle cx="9"  cy="26" r="5" fill="#4f8ef7"  opacity=".9"/>
+    </g>
+    <circle cx="26" cy="26" r="5" fill="#c070ff" opacity=".8">
+      <animate attributeName="r" values="4;7;4" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 2. Касание Небо.Реки — ripple
+  2:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="26" cy="26" r="5" fill="#35d4a0"/>
+    <circle cx="26" cy="26" r="5" stroke="#35d4a0" stroke-width="1.5" fill="none">
+      <animate attributeName="r" values="5;22" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".8;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="26" r="5" stroke="#35d4a0" stroke-width="1" fill="none">
+      <animate attributeName="r" values="5;16" dur="2s" begin=".6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".6;0" dur="2s" begin=".6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="26" r="5" stroke="#35d4a0" stroke-width="1" fill="none">
+      <animate attributeName="r" values="5;10" dur="2s" begin="1.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".4;0" dur="2s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 3. Наполнение — rising light particles
+  3:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="20" y="18" width="12" height="22" rx="2" fill="#4f8ef7" opacity=".2"/>
+    <ellipse cx="26" cy="42" rx="10" ry="3" fill="#4f8ef7" opacity=".15"/>
+    <rect x="24" y="42" width="4" height="6" rx="2" fill="#4f8ef7" opacity=".3"/>
+    <circle cx="26" cy="38" r="3" fill="#4f8ef7" opacity=".9">
+      <animate attributeName="cy" values="38;10" dur="2.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".9;0" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="20" cy="36" r="2" fill="#c070ff" opacity=".8">
+      <animate attributeName="cy" values="36;12" dur="2.8s" begin=".4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".8;0" dur="2.8s" begin=".4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="32" cy="36" r="2" fill="#f0c060" opacity=".7">
+      <animate attributeName="cy" values="36;12" dur="2.5s" begin=".8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".7;0" dur="2.5s" begin=".8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="23" cy="34" r="1.5" fill="#ff4f9e" opacity=".6">
+      <animate attributeName="cy" values="34;11" dur="3s" begin="1.1s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".6;0" dur="3s" begin="1.1s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 4. Палитра песков — swirling sand
+  4:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="26" cy="26" r="18" fill="none" stroke="#c070ff" stroke-width=".8" opacity=".25"/>
+    <g style="transform-origin:26px 26px;animation:spin 5s linear infinite">
+      <ellipse cx="26" cy="12" rx="5" ry="2.5" fill="#c070ff" opacity=".75"/>
+      <ellipse cx="26" cy="40" rx="5" ry="2.5" fill="#f0c060" opacity=".75"/>
+      <ellipse cx="12" cy="26" rx="2.5" ry="5" fill="#ff7c3e" opacity=".75"/>
+      <ellipse cx="40" cy="26" rx="2.5" ry="5" fill="#35d4a0" opacity=".75"/>
+    </g>
+    <circle cx="26" cy="26" r="5" fill="#c070ff" opacity=".5">
+      <animate attributeName="r" values="4;8;4" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".5;.2;.5" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 5. Оранжерея — swaying plant
+  5:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g style="transform-origin:26px 46px;animation:sway 3s ease-in-out infinite">
+      <line x1="26" y1="46" x2="26" y2="16" stroke="#35d4a0" stroke-width="2" stroke-linecap="round"/>
+      <ellipse cx="26" cy="12" rx="6" ry="9" fill="#35d4a0" opacity=".9"/>
+      <ellipse cx="16" cy="27" rx="5" ry="8" fill="#35d4a0" opacity=".7" transform="rotate(-30 16 27)"/>
+      <ellipse cx="36" cy="27" rx="5" ry="8" fill="#35d4a0" opacity=".7" transform="rotate(30 36 27)"/>
+      <ellipse cx="19" cy="38" rx="4" ry="6" fill="#35d4a0" opacity=".5" transform="rotate(-20 19 38)"/>
+      <ellipse cx="33" cy="38" rx="4" ry="6" fill="#35d4a0" opacity=".5" transform="rotate(20 33 38)"/>
+    </g>
+  </svg>`,
+
+  // 6. Симфония воды — wave + musical note
+  6:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 30 Q13 21 20 30 Q27 39 34 30 Q41 21 46 30" stroke="#35d4a0" stroke-width="2" fill="none" stroke-linecap="round">
+      <animate attributeName="d" dur="2s" repeatCount="indefinite"
+        values="M6 30 Q13 21 20 30 Q27 39 34 30 Q41 21 46 30;
+                M6 30 Q13 39 20 30 Q27 21 34 30 Q41 39 46 30;
+                M6 30 Q13 21 20 30 Q27 39 34 30 Q41 21 46 30"/>
+    </path>
+    <path d="M6 38 Q13 30 20 38 Q27 46 34 38 Q41 30 46 38" stroke="#35d4a0" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".5">
+      <animate attributeName="d" dur="2s" repeatCount="indefinite"
+        values="M6 38 Q13 30 20 38 Q27 46 34 38 Q41 30 46 38;
+                M6 38 Q13 46 20 38 Q27 30 34 38 Q41 46 46 38;
+                M6 38 Q13 30 20 38 Q27 46 34 38 Q41 30 46 38"/>
+    </path>
+    <line x1="36" y1="10" x2="36" y2="22" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="36" y1="10" x2="43" y2="12" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round"/>
+    <ellipse cx="34" cy="22" rx="3.5" ry="2.5" fill="#35d4a0" opacity=".9"/>
+  </svg>`,
+
+  // 7. Мост признаний — floating heart
+  7:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="10" y1="46" x2="42" y2="46" stroke="#c070ff" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    <circle cx="10" cy="46" r="2" fill="#c070ff" opacity=".4"/>
+    <circle cx="42" cy="46" r="2" fill="#c070ff" opacity=".4"/>
+    <path d="M26 38 Q8 27 9 17 Q9 9 18 10 Q24 11 26 18 Q28 11 34 10 Q43 9 43 17 Q44 27 26 38Z" fill="#c070ff" opacity=".75">
+      <animate attributeName="opacity" values=".75;.4;.75" dur="2.5s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate" values="0,0;0,-6;0,0" dur="2.5s" repeatCount="indefinite"/>
+    </path>
+  </svg>`,
+
+  // 8. Созвездие НебоРеки — twinkling stars
+  8:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="26" y1="15" x2="39" y2="28" stroke="#4f8ef7" stroke-width=".8" opacity=".3"/>
+    <line x1="39" y1="28" x2="34" y2="42" stroke="#4f8ef7" stroke-width=".8" opacity=".3"/>
+    <line x1="26" y1="15" x2="17" y2="32" stroke="#4f8ef7" stroke-width=".8" opacity=".3"/>
+    <line x1="17" y1="32" x2="34" y2="42" stroke="#4f8ef7" stroke-width=".8" opacity=".3"/>
+    <line x1="13" y1="17" x2="26" y2="15" stroke="#4f8ef7" stroke-width=".8" opacity=".2"/>
+    <circle cx="26" cy="15" r="3.5" fill="#4f8ef7"><animate attributeName="opacity" values="1;.2;1" dur="1.8s" repeatCount="indefinite"/></circle>
+    <circle cx="39" cy="28" r="2.5" fill="#4f8ef7"><animate attributeName="opacity" values="1;.2;1" dur="2.2s" begin=".3s" repeatCount="indefinite"/></circle>
+    <circle cx="17" cy="32" r="2.5" fill="#4f8ef7"><animate attributeName="opacity" values="1;.2;1" dur="1.6s" begin=".6s" repeatCount="indefinite"/></circle>
+    <circle cx="34" cy="42" r="3"   fill="#4f8ef7"><animate attributeName="opacity" values="1;.2;1" dur="2s"   begin=".9s" repeatCount="indefinite"/></circle>
+    <circle cx="13" cy="17" r="2"   fill="#4f8ef7"><animate attributeName="opacity" values="1;.2;1" dur="1.4s" begin="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="43" cy="13" r="1.5" fill="#c070ff"><animate attributeName="opacity" values="1;.2;1" dur="1.9s" begin=".5s" repeatCount="indefinite"/></circle>
+  </svg>`,
+
+  // 9. Окно спокойствия — calm water in window
+  9:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="7" y="12" width="38" height="30" rx="5" fill="rgba(53,212,160,.06)" stroke="#35d4a0" stroke-width="1.5"/>
+    <path d="M7 26 Q14 19 21 26 Q28 33 35 26 Q42 19 45 26" stroke="#35d4a0" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <animate attributeName="d" dur="3s" repeatCount="indefinite"
+        values="M7 26 Q14 19 21 26 Q28 33 35 26 Q42 19 45 26;
+                M7 26 Q14 33 21 26 Q28 19 35 26 Q42 33 45 26;
+                M7 26 Q14 19 21 26 Q28 33 35 26 Q42 19 45 26"/>
+    </path>
+    <path d="M7 34 Q14 28 21 34 Q28 40 35 34 Q42 28 45 34" stroke="#35d4a0" stroke-width="1" fill="none" stroke-linecap="round" opacity=".5">
+      <animate attributeName="d" dur="3s" repeatCount="indefinite"
+        values="M7 34 Q14 28 21 34 Q28 40 35 34 Q42 28 45 34;
+                M7 34 Q14 40 21 34 Q28 28 35 34 Q42 40 45 34;
+                M7 34 Q14 28 21 34 Q28 40 35 34 Q42 28 45 34"/>
+    </path>
+  </svg>`,
+
+  // 10. Аллея бабочек — fluttering butterfly
+  10:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="26" y1="15" x2="26" y2="38" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="26" cy="14" r="2.5" fill="#ff4f9e" opacity=".8"/>
+    <ellipse cx="14" cy="20" rx="12" ry="9" fill="#ff4f9e" opacity=".75" transform="rotate(-20 14 20)">
+      <animate attributeName="ry" values="9;2;9" dur=".75s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="38" cy="20" rx="12" ry="9" fill="#ff4f9e" opacity=".75" transform="rotate(20 38 20)">
+      <animate attributeName="ry" values="9;2;9" dur=".75s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="15" cy="33" rx="9"  ry="6"  fill="#c070ff" opacity=".6" transform="rotate(22 15 33)">
+      <animate attributeName="ry" values="6;2;6" dur=".75s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="37" cy="33" rx="9"  ry="6"  fill="#c070ff" opacity=".6" transform="rotate(-22 37 33)">
+      <animate attributeName="ry" values="6;2;6" dur=".75s" repeatCount="indefinite"/>
+    </ellipse>
+  </svg>`,
+
+  // 11. Послание Небо.Реки — hand + light
+  11:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 38 L13 26 Q13 22 17 22 L17 20 Q17 17 20 17 Q23 17 23 20 L23 22 Q26 22 26 25 L26 22 Q26 19 29 19 Q32 19 32 22 L32 24 Q35 24 35 27 L35 38 Q35 44 25 44 Q13 44 13 38Z" fill="#4f8ef7" opacity=".3" stroke="#4f8ef7" stroke-width="1"/>
+    <circle cx="26" cy="11" r="4.5" fill="#f0c060" opacity=".9">
+      <animate attributeName="cy" values="11;20;11" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".9;.3;.9" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4.5;2;4.5" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="11" r="4" stroke="#f0c060" fill="none" stroke-width=".8" opacity="0">
+      <animate attributeName="r" values="4;16" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".6;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 12. Смотровая площадка — rising panorama
+  12:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M5 35 Q26 8 47 35" stroke="#4f8ef7" stroke-width="1.5" fill="rgba(79,142,247,.05)" stroke-linecap="round"/>
+    <line x1="5" y1="42" x2="47" y2="42" stroke="#4f8ef7" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+    <circle cx="26" cy="27" r="7" fill="none" stroke="#4f8ef7" stroke-width="1.5">
+      <animate attributeName="r" values="7;9;7" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;.5;1" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="27" r="3.5" fill="#4f8ef7" opacity=".8"/>
+    <circle cx="26" cy="27" r="7" stroke="#4f8ef7" stroke-width=".8" fill="none" opacity="0">
+      <animate attributeName="r" values="9;20" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".4;0" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 13. Кофейня — steaming cup
+  13:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 28 L13 44 Q13 46 15 46 L37 46 Q39 46 39 44 L39 28Z" fill="#ff4f9e" opacity=".2" stroke="#ff4f9e" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M39 31 Q47 31 47 37 Q47 43 39 43" stroke="#ff4f9e" stroke-width="1.5" fill="none"/>
+    <line x1="13" y1="28" x2="39" y2="28" stroke="#ff4f9e" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M20 24 Q22 18 20 13" stroke="#ff4f9e" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <animate attributeName="d" values="M20 24 Q22 18 20 13;M20 24 Q18 18 20 13;M20 24 Q22 18 20 13" dur="2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M26 22 Q28 16 26 11" stroke="#ff4f9e" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".7">
+      <animate attributeName="d" values="M26 22 Q28 16 26 11;M26 22 Q24 16 26 11;M26 22 Q28 16 26 11" dur="2.4s" repeatCount="indefinite"/>
+    </path>
+    <path d="M32 24 Q30 18 32 13" stroke="#ff4f9e" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".5">
+      <animate attributeName="d" values="M32 24 Q30 18 32 13;M32 24 Q34 18 32 13;M32 24 Q30 18 32 13" dur="1.8s" repeatCount="indefinite"/>
+    </path>
+  </svg>`,
+
+  // 14. Свет в руках — rocking beam
+  14:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g style="transform-origin:26px 11px;animation:beam-rock 3s ease-in-out infinite">
+      <rect x="22" y="7" width="8" height="8" rx="2" fill="#4f8ef7"/>
+      <polygon points="18,15 34,15 42,48 10,48" fill="#4f8ef7" opacity=".1"/>
+      <polygon points="20,15 32,15 37,34 15,34" fill="#4f8ef7" opacity=".2"/>
+    </g>
+  </svg>`,
+
+  // 15. Невесомость — swinging hammock
+  15:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="12" y1="7" x2="40" y2="7" stroke="#ff7c3e" stroke-width="1.5" stroke-linecap="round"/>
+    <g style="transform-origin:26px 7px;animation:sway 2.5s ease-in-out infinite">
+      <line x1="26" y1="7" x2="26" y2="24" stroke="#ff7c3e" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="11" y="24" width="30" height="10" rx="5" fill="#ff7c3e" opacity=".65"/>
+      <circle cx="26" cy="38" r="7" fill="#ff7c3e" opacity=".55">
+        <animate attributeName="r" values="7;9;7" dur="2.5s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+  </svg>`,
+
+  // 16. Полёт над облаками — swing + clouds
+  16:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="14" cy="42" rx="10" ry="4.5" fill="white" opacity=".05"/>
+    <ellipse cx="38" cy="46" rx="12" ry="4"   fill="white" opacity=".04"/>
+    <ellipse cx="26" cy="40" rx="18" ry="5.5" fill="white" opacity=".04"/>
+    <line x1="8" y1="7" x2="44" y2="7" stroke="#ff7c3e" stroke-width="1.5" stroke-linecap="round"/>
+    <g style="transform-origin:26px 7px;animation:sway 2s ease-in-out infinite">
+      <line x1="17" y1="7" x2="13" y2="24" stroke="#ff7c3e" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="35" y1="7" x2="39" y2="24" stroke="#ff7c3e" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="13" y="24" width="26" height="8" rx="3" fill="#ff7c3e" opacity=".65"/>
+      <circle cx="26" cy="20" r="5.5" fill="#ff7c3e" opacity=".5"/>
+    </g>
+  </svg>`,
+
+  // 17. Путешествие по реке — sailing boat
+  17:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 36 Q13 28 22 36 Q31 44 40 36 Q46 30 48 36" stroke="#35d4a0" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <animate attributeName="d" dur="2s" repeatCount="indefinite"
+        values="M4 36 Q13 28 22 36 Q31 44 40 36 Q46 30 48 36;
+                M4 36 Q13 44 22 36 Q31 28 40 36 Q46 42 48 36;
+                M4 36 Q13 28 22 36 Q31 44 40 36 Q46 30 48 36"/>
+    </path>
+    <g style="animation:bob 2s ease-in-out infinite">
+      <path d="M13 32 L39 32 L35 42 L17 42Z" fill="#35d4a0" opacity=".55"/>
+      <line x1="26" y1="32" x2="26" y2="16" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round"/>
+      <polygon points="26,16 40,23 26,30" fill="#35d4a0" opacity=".45"/>
+    </g>
+  </svg>`,
+
+  // 18. Касание стихии — glowing footprint in water
+  18:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="37" width="42" height="12" rx="4" fill="rgba(53,212,160,.07)" stroke="rgba(53,212,160,.2)" stroke-width="1"/>
+    <ellipse cx="26" cy="37" rx="9" ry="3" fill="#35d4a0" opacity=".45">
+      <animate attributeName="rx" values="9;18;9" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".45;0;.45" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M18 33 Q18 24 20 20 Q22 15 26 17 Q30 15 32 20 Q34 24 34 33" fill="#35d4a0" opacity=".28" stroke="#35d4a0" stroke-width="1"/>
+    <circle cx="19" cy="13" r="2.5" fill="#35d4a0" opacity=".6"/>
+    <circle cx="33" cy="13" r="2.5" fill="#35d4a0" opacity=".6"/>
+  </svg>`,
+
+  // 19. Водопад — falling streams
+  19:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="9" y="6" width="34" height="8" rx="3" fill="#35d4a0" opacity=".4"/>
+    <rect x="8" y="37" width="36" height="8" rx="3" fill="#35d4a0" opacity=".2"/>
+    <line x1="18" y1="14" x2="18" y2="37" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3">
+      <animate attributeName="stroke-dashoffset" values="0;-14" dur=".8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="26" y1="14" x2="26" y2="37" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3">
+      <animate attributeName="stroke-dashoffset" values="0;-14" dur=".8s" begin=".2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="34" y1="14" x2="34" y2="37" stroke="#35d4a0" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3">
+      <animate attributeName="stroke-dashoffset" values="0;-14" dur=".8s" begin=".4s" repeatCount="indefinite"/>
+    </line>
+  </svg>`,
+
+  // 20. Сколько в тебе цветов — expanding color rings
+  20:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="26" cy="26" r="5" fill="#c070ff"/>
+    <circle cx="26" cy="26" r="5" stroke="#ff4f9e" stroke-width="1.5" fill="none">
+      <animate attributeName="r" values="5;11" dur="2s" begin="0s"    repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".9;0" dur="2s" begin="0s"    repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="26" r="5" stroke="#f0c060" stroke-width="1.5" fill="none">
+      <animate attributeName="r" values="5;17" dur="2s" begin=".4s"   repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".8;0" dur="2s" begin=".4s"   repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="26" r="5" stroke="#35d4a0" stroke-width="1.5" fill="none">
+      <animate attributeName="r" values="5;22" dur="2s" begin=".8s"   repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".7;0" dur="2s" begin=".8s"   repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="26" r="5" stroke="#4f8ef7" stroke-width="1" fill="none">
+      <animate attributeName="r" values="5;26" dur="2s" begin="1.2s"  repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".5;0" dur="2s" begin="1.2s"  repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 21. Письмо себе в будущее — envelope with stars
+  21:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="7" y="18" width="38" height="28" rx="3" fill="rgba(192,112,255,.1)" stroke="#c070ff" stroke-width="1.5"/>
+    <path d="M7 20 L26 33 L45 20" stroke="#c070ff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <circle cx="38" cy="11" r="4" fill="#f0c060" opacity=".9">
+      <animate attributeName="opacity" values=".9;.3;.9" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="8"  r="2.5" fill="#f0c060" opacity=".7">
+      <animate attributeName="opacity" values=".7;.2;.7" dur="2.5s" begin=".5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="44" cy="18" r="1.5" fill="#c070ff" opacity=".6">
+      <animate attributeName="opacity" values=".6;.1;.6" dur="1.8s" begin=".3s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`,
+
+  // 22. Библиотека тишины — open glowing book
+  22:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M26 13 Q26 11 9 13 L9 43 Q26 41 26 43 Q26 41 43 43 L43 13 Q26 11 26 13Z" fill="rgba(240,192,96,.07)" stroke="#f0c060" stroke-width="1.5" stroke-linejoin="round"/>
+    <line x1="26" y1="13" x2="26" y2="43" stroke="#f0c060" stroke-width="1.5"/>
+    <line x1="13" y1="20" x2="22" y2="20" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <line x1="13" y1="27" x2="22" y2="27" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <line x1="13" y1="34" x2="22" y2="34" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <line x1="30" y1="20" x2="39" y2="20" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <line x1="30" y1="27" x2="39" y2="27" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <line x1="30" y1="34" x2="39" y2="34" stroke="#f0c060" stroke-width=".8" opacity=".5"/>
+    <ellipse cx="26" cy="27" rx="16" ry="10" stroke="#f0c060" stroke-width=".5" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;.35;0" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="rx" values="16;24;16" dur="3s" repeatCount="indefinite"/>
+    </ellipse>
+  </svg>`,
+
+  // 23. Небо покоя — floating fish + stars
+  23:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="13" cy="11" r="1.5" fill="#f0c060" opacity=".8"><animate attributeName="opacity" values=".8;.2;.8" dur="2s"   repeatCount="indefinite"/></circle>
+    <circle cx="39" cy="8"  r="1"   fill="#f0c060" opacity=".7"><animate attributeName="opacity" values=".7;.1;.7" dur="1.6s" begin=".4s" repeatCount="indefinite"/></circle>
+    <circle cx="45" cy="20" r="1.5" fill="#f0c060" opacity=".6"><animate attributeName="opacity" values=".6;.1;.6" dur="2.4s" begin=".8s" repeatCount="indefinite"/></circle>
+    <circle cx="7"  cy="22" r="1"   fill="#c070ff" opacity=".6"><animate attributeName="opacity" values=".6;.1;.6" dur="1.8s" begin="1.2s" repeatCount="indefinite"/></circle>
+    <g style="animation:bob 4s ease-in-out infinite">
+      <path d="M13 33 Q20 25 28 29 Q36 33 42 27 L46 34 Q38 36 30 32 Q22 28 13 36Z" fill="#f0c060" opacity=".45"/>
+      <circle cx="15" cy="33" r="2.5" fill="#f0c060" opacity=".6"/>
+    </g>
+    <g style="animation:bob 5s ease-in-out infinite;transform:translateY(8px)">
+      <path d="M7 45 Q15 38 22 42 Q29 46 35 40 L39 47 Q32 49 24 45 Q16 41 7 47Z" fill="#c070ff" opacity=".32"/>
+      <circle cx="9" cy="45" r="2" fill="#c070ff" opacity=".5"/>
+    </g>
+  </svg>`,
+};
+
+/* ── Zone data ── */
+const ZONES = [
+  { id:1,  color:'c2', tag:'ИНТЕРАКТИВ',   pos:{left:'4%',   top:'88%'},
+    title:'Карта состояний',
+    desc:'Выбери цвет нити, который ближе всего твоему сердцу именно сейчас, и оставь его на карте состояний Небо.Реки:\n\n🔴 Энергия, любовь, вовлечённость\n🟢 Покой, потребность в отдыхе, внутренний баланс\n🟡 Радость, лёгкость, стремление к новому\n🔵 Грусть, подавленность, закрытость' },
+
+  { id:2,  color:'c3', tag:'ИНТЕРАКТИВ',   pos:{left:'4%',   top:'47%'},
+    title:'Касание Небо.Реки',
+    desc:'Прикоснись к стене и наблюдай, как пространство отвечает на твои движения.' },
+
+  { id:3,  color:'c1', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'3.2%', top:'8%'},
+    title:'Наполнение',
+    desc:'Встань напротив зеркала, смотри на своё отражение — видишь, как свет, энергия и цветы наполняют тебя?' },
+
+  { id:4,  color:'c2', tag:'ИНТЕРАКТИВ',   pos:{left:'18.5%',top:'54%'},
+    title:'Палитра песков',
+    desc:'Рисуй на песке руками, не стесняясь и не пытаясь изобразить что-то конкретное. Забудь о формах и линиях — просто твори.\n\nНе забудь забрать на память цвет силы Небо.Реки, собрав частицы песка в баночку.\n\nСоздай свою уникальную песочную композицию:\n\n✦ «Тепло прикосновения» — тепло, забота и нежность\n✦ «Глубина интуиции» — интуиция, вдохновение и внутренний поиск\n✦ «Импульс движения» — энергия, решимость и сила\n✦ «Точка роста» — обновление, свежесть и гармония\n✦ «Глубина ясности» — спокойствие, уверенность и чистота мыслей\n✦ «Свет момента» — радость, лёгкость и любопытство' },
+
+  { id:5,  color:'c3', tag:'ОРАНЖЕРЕЯ',    pos:{left:'24%',  top:'54%'},
+    title:'Оранжерея',
+    desc:'Рисуй, играй на пианино или просто побудь среди света, зелени и живых цветов, созерцая жизнь вокруг.' },
+
+  { id:6,  color:'c3', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'27.5%',top:'9%'},
+    title:'Симфония воды',
+    desc:'Прикоснись к воде руками и послушай, как каждое движение превращается в звук.' },
+
+  { id:7,  color:'c2', tag:'ИНТЕРАКТИВ',   pos:{left:'34%',  top:'82%'},
+    title:'Мост признаний',
+    desc:'Напиши фразу, послание или признание и оставь его на мосту над водой.',
+    notes:'Правила безопасности:\n• Максимум 5 человек на мосту одновременно\n• Передвигайтесь спокойно, избегая резких движений\n• Запрещено раскачивать конструкцию, бегать или прыгать\n• Рекомендуется держаться за поручни\n• Родители несут ответственность за детей' },
+
+  { id:8,  color:'c1', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'42%',  top:'8%'},
+    title:'Созвездие НебоРеки',
+    desc:'Создай свою звезду и управляй световыми частицами движением рук.' },
+
+  { id:9,  color:'c3', tag:'РЕЛАКС',        pos:{left:'38%',  top:'27%'},
+    title:'Окно спокойствия',
+    desc:'Остановись, приляг и понаблюдай за водой внутри горы.' },
+
+  { id:10, color:'c5', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'46.5%',top:'8%'},
+    title:'Аллея бабочек',
+    desc:'Скажи что-то в микрофон — это может быть слово, шёпот или громкое дыхание, и увидишь, как пространство вокруг наполнится бабочками.' },
+
+  { id:11, color:'c1', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'51%',  top:'19%'},
+    title:'Послание Небо.Реки',
+    desc:'Протяни руку к свету и получи личное послание на своей ладони.' },
+
+  { id:12, color:'c1', tag:'СМОТРОВАЯ',    pos:{left:'55%',  top:'8%'},
+    title:'Смотровая площадка',
+    desc:'Место, где пространство теряет границы. Остановись, чтобы почувствовать себя частью чего-то великого.',
+    notes:'Вход со второго этажа →' },
+
+  { id:13, color:'c5', tag:'КАФЕ',          pos:{left:'59%',  top:'19%'},
+    title:'Кофейня и сувениры',
+    desc:'Кофе, напитки и сувениры на память о Небо.Реке.' },
+
+  { id:14, color:'c1', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'63.5%',top:'8%'},
+    title:'Свет в руках',
+    desc:'Встань под луч света и управляй его формой, шириной и цветом движением рук. Не торопись — вы должны слиться в единую световую мелодию.' },
+
+  { id:15, color:'c4', tag:'АКТИВНОСТЬ',   pos:{left:'68.5%',top:'8%'},
+    title:'Невесомость',
+    desc:'Покачайся в пространстве НебоРеки и почувствуй лёгкость движения.' },
+
+  { id:16, color:'c4', tag:'АКТИВНОСТЬ',   pos:{left:'67%',  top:'42%'},
+    title:'Полёт над облаками',
+    desc:'Поднимись выше облаков и прокатись на качелях, любуясь величием планеты.',
+    notes:'Стоимость полёта: 10 BYN\nБилеты приобретаются в кассе или кафе\n\nПравила безопасности:\n• Возраст: от 5 лет\n• Максимальный вес: до 100 кг\n• Запрещено вставать и совершать резкие движения\n• Запрещено использовать в состоянии опьянения\n• Следуйте указаниям инструктора' },
+
+  { id:17, color:'c3', tag:'АКТИВНОСТЬ',   pos:{left:'86%',  top:'76%'},
+    title:'Путешествие по реке',
+    desc:'Проплыви на лодке по течению и рассмотри новые смыслы в том, что ты уже видел, в другом ракурсе.' },
+
+  { id:18, color:'c3', tag:'ИНТЕРАКТИВ',   pos:{left:'91%',  top:'79%'},
+    title:'Касание стихии',
+    desc:'Пройди босиком по воде и наблюдай, как под ногами появляется живое свечение.',
+    notes:'Правила безопасности:\n• Запрещено находиться в воде в обуви, с едой и напитками\n• Не допускается брызгаться, бегать, совершать резкие движения\n• Соблюдайте дистанцию и уважайте личное пространство\n• Берегите личные вещи — команда не несёт ответственности за их сохранность\n• Родители несут ответственность за детей\n\nВажно: вода проходит непрерывную фильтрацию и обеззараживание. Перед контактом протрите стопы салфеткой.' },
+
+  { id:19, color:'c3', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'61%',  top:'73%'},
+    title:'Водопад',
+    desc:'Закрой глаза и вслушайся в переливы воды. Вода наполняет пространство жизнью, а тебя — новой энергией.' },
+
+  { id:20, color:'c2', tag:'ИНСТАЛЛЯЦИЯ',  pos:{left:'54%',  top:'71%'},
+    title:'Сколько в тебе цветов',
+    desc:'Встань на платформу и узнай, сколько цветов скрывается внутри тебя.' },
+
+  { id:21, color:'c2', tag:'ПИСЬМО',        pos:{left:'19%',  top:'88%'},
+    title:'Письмо себе в будущее',
+    desc:'Напиши письмо самому себе, которое ты получишь через год. Что ты хочешь себе сказать?',
+    notes:'Чтобы получить письмо в будущем, необходимо приобрести конверт в кассе, заполнить его и оставить в специальном ящике на выходе.' },
+
+  { id:22, color:'c6', tag:'РЕЛАКС',        pos:{left:'11%',  top:'88%'},
+    title:'Библиотека тишины',
+    desc:'Остановись и побудь немного наедине с собой. Некоторые книги здесь хранят послания от других гостей. Возможно, что-то вдохновит именно тебя.' },
+
+  { id:23, color:'c6', tag:'РЕЛАКС',        pos:{left:'8.5%', top:'43%'},
+    title:'Небо покоя',
+    desc:'Погружение начинается с тишины. Ложись и наблюдай, как плывут рыбы и мерцают созвездия. Надень наушники — и звуки унесут тебя ещё дальше. Подари себе минуты полного расслабления: здесь и сейчас, без мыслей, без спешки, без шума.',
+    notes:'Нахождение на подушке допускается ТОЛЬКО в бахилах и БЕЗ обуви.' },
+];
+
+const C = { c1:'var(--c1)', c2:'var(--c2)', c3:'var(--c3)', c4:'var(--c4)', c5:'var(--c5)', c6:'var(--c6)' };
+
+let active = null;
+const infoEl = document.getElementById('info');
+const dotsEl = document.getElementById('dots');
+const zlistEl = document.getElementById('zlist');
+
+function select(id) {
+  if (active === id) {
+    active = null;
+    document.querySelectorAll('.zdot,.zitem').forEach(el => el.classList.remove('active'));
+    infoEl.style.borderColor = '';
+    infoEl.innerHTML = '<div class="info-empty">Нажми на зону, чтобы узнать подробнее</div>';
+    return;
   }
+  active = id;
+  document.querySelectorAll('.zdot,.zitem').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll(`[data-id="${id}"]`).forEach(el => el.classList.add('active'));
 
-  const svgs = {
-    // Луч — качающийся прожектор с лучом
-    1: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g style="transform-origin:28px 14px; animation:beam-rotate 2.4s ease-in-out infinite alternate;">
-        <rect x="24" y="8" width="8" height="10" rx="2" fill="#4f8ef7"/>
-        <polygon points="18,18 38,18 44,48 12,48" fill="#4f8ef7" opacity="0.18"/>
-        <polygon points="22,18 34,18 36,36 20,36" fill="#4f8ef7" opacity="0.35"/>
-      </g>
-      <circle cx="28" cy="50" r="3" fill="#4f8ef7" opacity="0.5">
-        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite"/>
-      </circle>
-    </svg>`,
+  const z   = ZONES.find(z => z.id === id);
+  const col = C[z.color];
 
-    // Молния — вспышка с мерцанием
-    2: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g style="animation:flash 1.8s ease-in-out infinite;">
-        <polygon points="30,4 18,28 26,28 22,52 38,24 30,24" fill="#e05cff"/>
-        <polygon points="30,4 18,28 26,28 22,52 38,24 30,24" fill="#e05cff" opacity="0.3" transform="scale(1.15) translate(-4,-4)"/>
-      </g>
-      <circle cx="28" cy="28" r="20" stroke="#e05cff" stroke-width="1" opacity="0">
-        <animate attributeName="r" values="10;26" dur="1.8s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0.5;0" dur="1.8s" repeatCount="indefinite"/>
-      </circle>
-    </svg>`,
+  infoEl.style.borderColor = col.replace('var(--','').replace(')','');
+  infoEl.style.borderColor = `color-mix(in srgb, ${col} 50%, transparent)`;
+  infoEl.innerHTML = `
+    <div class="info-top">
+      <div class="info-icon" style="background:color-mix(in srgb,${col} 10%,transparent)">${ICONS[id]}</div>
+      <div class="info-meta">
+        <div class="info-num" style="color:${col}">ЗОНА ${id} · ${z.tag}</div>
+        <div class="info-title">${z.title}</div>
+      </div>
+    </div>
+    <div class="info-desc">${z.desc.replace(/\n/g,'<br>')}</div>
+    ${z.notes ? `<div class="info-notes"><div class="info-notes-hd">⚠ ВАЖНО</div><div class="info-notes-body">${z.notes.replace(/\n/g,'<br>')}</div></div>` : ''}
+  `;
 
-    // Лаванда — покачивающийся стебель с листьями
-    3: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g style="transform-origin:28px 48px; animation:sway 3s ease-in-out infinite;">
-        <line x1="28" y1="48" x2="28" y2="16" stroke="#35d4a0" stroke-width="2" stroke-linecap="round"/>
-        <ellipse cx="28" cy="12" rx="5" ry="8" fill="#35d4a0" opacity="0.9"/>
-        <ellipse cx="20" cy="26" rx="4" ry="7" fill="#35d4a0" opacity="0.7" transform="rotate(-30 20 26)"/>
-        <ellipse cx="36" cy="26" rx="4" ry="7" fill="#35d4a0" opacity="0.7" transform="rotate(30 36 26)"/>
-        <ellipse cx="22" cy="36" rx="3" ry="5" fill="#35d4a0" opacity="0.5" transform="rotate(-20 22 36)"/>
-        <ellipse cx="34" cy="36" rx="3" ry="5" fill="#35d4a0" opacity="0.5" transform="rotate(20 34 36)"/>
-      </g>
-    </svg>`,
+  if (window.Telegram?.WebApp?.HapticFeedback)
+    Telegram.WebApp.HapticFeedback.impactOccurred('light');
 
-    // Вода — расходящиеся круги
-    4: `<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="28" cy="30" r="4" fill="#ff7c3e" opacity="0.9"/>
-      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1.5" fill="none">
-        <animate attributeName="r" values="4;22" dur="2s" repeatCount="indefinite" begin="0s"/>
-        <animate attributeName="opacity" values="0.9;0" dur="2s" repeatCount="indefinite" begin="0s"/>
-      </circle>
-      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1" fill="none">
-        <animate attributeName="r" values="4;18" dur="2s" repeatCount="indefinite" begin="0.6s"/>
-        <animate attributeName="opacity" values="0.7;0" dur="2s" repeatCount="indefinite" begin="0.6s"/>
-      </circle>
-      <circle cx="28" cy="30" r="4" stroke="#ff7c3e" stroke-width="1" fill="none">
-        <animate attributeName="r" values="4;14" dur="2s" repeatCount="indefinite" begin="1.2s"/>
-        <animate attributeName="opacity" values="0.5;0" dur="2s" repeatCount="indefinite" begin="1.2s"/>
-      </circle>
-      <ellipse cx="28" cy="44" rx="16" ry="4" fill="#ff7c3e" opacity="0.08"/>
-    </svg>`,
-  };
+  infoEl.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
 
-  const exhibits = [
-    {
-      id: 1,
-      title: "Луч с управлением",
-      color: "c1",
-      tag: "ИНСТАЛЛЯЦИЯ",
-      desc: "Направленный луч прожектора следует за зрителем через датчики движения. Свет не отпускает.",
-      pos: { left: "8%", top: "8%", width: "36%", height: "36%" },
-    },
-    {
-      id: 2,
-      title: "Письмо вспышка",
-      color: "c2",
-      tag: "ФОТОГРАФИЯ",
-      desc: "Крупноформатные снимки удара молнии над рекой, напечатанные на полупрозрачной бумаге с подсветкой сзади. Кадр, существующий долю секунды — и остающийся навсегда.",
-      pos: { right: "8%", top: "8%", width: "36%", height: "36%" },
-    },
-    {
-      id: 3,
-      title: "Сколько лаванды ты весишь",
-      color: "c3",
-      tag: "ОБЪЕКТ",
-      desc: "Весы: на одной чаше — сухая лаванда, на другой — чистый лист. Зритель добавляет записки с собственными словами. Запах, вес и текст в постоянном неустойчивом равновесии.",
-      pos: { left: "8%", bottom: "10%", width: "36%", height: "34%" },
-    },
-    {
-      id: 4,
-      title: "Хождение по воде",
-      color: "c4",
-      tag: "ВИДЕО",
-      desc: "Проекция поверхности реки на пол зала. Когда зритель заходит в зону — рябь расходится от ног. Тело становится камнем, брошенным в воду. Или — человеком, который верит.",
-      pos: { right: "8%", bottom: "10%", width: "36%", height: "34%" },
-    },
-  ];
+ZONES.forEach(z => {
+  const col = C[z.color];
 
-  const hall = document.getElementById("hall");
-  const info = document.getElementById("info");
-  const list = document.getElementById("list");
-  let active = null;
+  // dot
+  const dot = document.createElement('div');
+  dot.className = 'zdot';
+  dot.dataset.id = z.id;
+  dot.style.left  = z.pos.left;
+  dot.style.top   = z.pos.top;
+  dot.style.color = col;
+  dot.textContent = z.id;
+  dot.addEventListener('click', () => select(z.id));
+  dotsEl.appendChild(dot);
 
-  function select(id) {
-    const ex = exhibits.find(e => e.id === id);
-    document.querySelectorAll(".zone, .list-item").forEach(el => el.classList.remove("active"));
+  // list item
+  const item = document.createElement('div');
+  item.className = 'zitem';
+  item.dataset.id = z.id;
+  item.innerHTML = `
+    <div class="znum" style="color:${col};border-color:color-mix(in srgb,${col} 55%,transparent)">${z.id}</div>
+    <div class="zname">${z.title}</div>
+  `;
+  item.addEventListener('click', () => select(z.id));
+  zlistEl.appendChild(item);
+});
 
-    if (active === id) {
-      active = null;
-      info.className = "info-panel";
-      info.innerHTML = '<div class="info-empty">Нажми на зону чтобы узнать подробнее</div>';
-      return;
-    }
-
-    active = id;
-    document.querySelectorAll(`[data-id="${id}"]`).forEach(el => el.classList.add("active"));
-
-    info.className = `info-panel ${ex.color}`;
-    info.innerHTML = `
-      <div class="info-tag">${ex.tag} · ${ex.id} / ${exhibits.length}</div>
-      <div class="info-title">${ex.title}</div>
-      <div class="info-desc">${ex.desc}</div>
-    `;
-
-    if (window.Telegram?.WebApp?.HapticFeedback) {
-      Telegram.WebApp.HapticFeedback.impactOccurred("light");
-    }
-
-    info.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  // Auto-open zone: from Telegram startapp param or URL ?zone=
-  if (window.Telegram?.WebApp) {
-    window.Telegram.WebApp.ready();
-    window.Telegram.WebApp.expand();
-  }
-  const tgStartParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
-  const urlZone = parseInt(tgStartParam || new URLSearchParams(window.location.search).get("zone"));
-
-  exhibits.forEach(ex => {
-    const zone = document.createElement("div");
-    zone.className = "zone";
-    zone.dataset.id = ex.id;
-    Object.assign(zone.style, ex.pos);
-    zone.innerHTML = `
-      <div class="zone-icon">${svgs[ex.id]}</div>
-      <div class="zone-num">${ex.id}</div>
-      <div class="zone-label">${ex.title}</div>
-    `;
-    zone.addEventListener("click", () => select(ex.id));
-    hall.appendChild(zone);
-
-    const item = document.createElement("div");
-    item.className = "list-item";
-    item.dataset.id = ex.id;
-    item.innerHTML = `
-      <div class="list-dot"></div>
-      <div class="list-text">${ex.title}</div>
-    `;
-    item.addEventListener("click", () => select(ex.id));
-    list.appendChild(item);
-  });
-
-  if (urlZone >= 1 && urlZone <= exhibits.length) {
-    setTimeout(() => {
-      select(urlZone);
-      document.getElementById("info")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 600);
-  }
+// auto-open zone from Telegram startapp param or ?zone=
+const tgParam  = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+const urlZone  = parseInt(tgParam || new URLSearchParams(location.search).get('zone'));
+if (urlZone >= 1 && urlZone <= 23) {
+  setTimeout(() => {
+    select(urlZone);
+    infoEl.scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 600);
+}
 </script>
 </body>
 </html>
