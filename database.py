@@ -152,6 +152,12 @@ async def get_all_user_ids() -> list[int]:
     return [int(row["user_id"]) for row in _rows(result)]
 
 
+async def get_phone(user_id: int) -> str | None:
+    result = await _execute("SELECT phone FROM users WHERE user_id = ?", [user_id])
+    rows = _rows(result)
+    return rows[0]["phone"] if rows else None
+
+
 async def save_phone(user_id: int, phone: str):
     await _execute("UPDATE users SET phone = ? WHERE user_id = ?", [phone, user_id])
 

@@ -126,20 +126,23 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if await db.user_exists(user.id):
-        await update.message.reply_text(
-            f"👋 С возвращением, {user.first_name}!",
-            reply_markup=bottom_keyboard(),
-        )
-        await _send_main_menu_msg(update)
-        return
+        phone = await db.get_phone(user.id)
+        if phone:
+            await update.message.reply_text(
+                f"👋 С возвращением, {user.first_name}!",
+                reply_markup=bottom_keyboard(),
+            )
+            await _send_main_menu_msg(update)
+            return
 
-    await db.add_user(
-        user_id=user.id,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-    logger.info("Новый пользователь: %s (%s)", user.full_name, user.id)
+    if not await db.user_exists(user.id):
+        await db.add_user(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+        logger.info("Новый пользователь: %s (%s)", user.full_name, user.id)
 
     keyboard = ReplyKeyboardMarkup(
         [
@@ -154,8 +157,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Добро пожаловать в Клуб друзей RAZMAN production.\n\n"
         "📲 Поделись контактом и получи:\n\n"
         "✅ Скидки для участников\n"
-        "✅ Анонсы мероприятий первым\n"
-        "✅ Участие в розыгрышах\n\n"
+        "✅ Анонсы мероприятий первым\n\n"
         "👇 Нажми кнопку ниже",
         reply_markup=keyboard,
     )
