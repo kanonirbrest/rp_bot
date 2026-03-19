@@ -271,8 +271,7 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -380,8 +379,7 @@ async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -542,8 +540,7 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
