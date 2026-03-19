@@ -79,6 +79,7 @@ def main_menu_inline() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📅 Ближайшие анонсы",            callback_data="cb_announcements")],
         [InlineKeyboardButton("🎁 Подарочные сертификаты",      callback_data="cb_certificates")],
         [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
+        [InlineKeyboardButton("📞 Связаться с нами",             callback_data="cb_contact")],
         [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
         [InlineKeyboardButton("ℹ️ О RAZMAN production",         url=ABOUT_URL)],
         [InlineKeyboardButton("🗺 Карта выставки",              web_app=WebAppInfo(url=MAP_BASE_URL))],
@@ -456,6 +457,18 @@ async def cb_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await _send_giveaway(query.message, query.from_user)
+
+
+async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        f"📞 Связаться с нами\n\n{PHONE}",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
+             InlineKeyboardButton("✈️ Написать в ТГ", url="https://t.me/DEI_by_RP")],
+        ]),
+    )
 
 
 # ── Review conversation ────────────────────────────────────────────
@@ -855,6 +868,7 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_faq,         pattern="^cb_faq$"))
     app.add_handler(CallbackQueryHandler(cb_faq_item,    pattern="^faq_"))
     app.add_handler(CallbackQueryHandler(cb_giveaway,    pattern="^cb_giveaway$"))
+    app.add_handler(CallbackQueryHandler(cb_contact,     pattern="^cb_contact$"))
 
     # Message handlers
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
