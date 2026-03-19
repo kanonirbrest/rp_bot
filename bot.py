@@ -197,10 +197,10 @@ async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 Связаться с нами:",
+        f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}")],
-            [InlineKeyboardButton("✈️ Написать в ТГ",  url=f"https://t.me/{PHONE.replace('+', '')}")],
+            [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}"),
+             InlineKeyboardButton("✈️ Написать в ТГ",  url=f"https://t.me/{PHONE.replace('+', '')}")],
         ]),
     )
 
