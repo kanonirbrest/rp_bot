@@ -83,7 +83,7 @@ def main_menu_inline() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
         [InlineKeyboardButton("📞 Связаться с нами",            callback_data="cb_contact")],
         [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
-        [InlineKeyboardButton("ℹ️ О RAZMAN production",         url=ABOUT_URL)],
+        [InlineKeyboardButton("ℹ️ О RAZMAN production",         callback_data="cb_about")],
     ])
 
 
@@ -545,6 +545,29 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cb_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "О RAZMAN production ℹ️\n\n"
+        "Razman Production — команда, которая создаёт масштабные иммерсивные арт-проекты "
+        "на стыке технологий, природы и живого искусства.\n\n"
+        "Наши проекты — это пространства, где каждый может остановиться, "
+        "почувствовать и пережить что-то настоящее."
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌐 Сайт RAZMAN production", url=ABOUT_URL)],
+    ])
+    try:
+        photo = await db.get_setting("about_photo")
+    except Exception:
+        photo = None
+    if photo:
+        await query.message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+    else:
+        await query.message.reply_text(text, reply_markup=kb)
+
+
 # ── Review conversation ────────────────────────────────────────────
 async def review_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
@@ -730,6 +753,17 @@ async def cmd_setcertphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id = update.message.photo[-1].file_id
     await db.set_setting("cert_photo", file_id)
     await update.message.reply_text("✅ Фото сертификатов обновлено!")
+
+
+async def cmd_setaboutphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not update.message.photo:
+        await update.message.reply_text("Отправь фото с командой /setaboutphoto в подписи.")
+        return
+    file_id = update.message.photo[-1].file_id
+    await db.set_setting("about_photo", file_id)
+    await update.message.reply_text("✅ Фото раздела «О RAZMAN production» обновлено!")
 
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -959,6 +993,8 @@ def main():
     app.add_handler(CommandHandler("setmainphoto", cmd_setmainphoto))
     app.add_handler(CommandHandler("setexhibitionphoto", cmd_setexhibitionphoto))
     app.add_handler(CommandHandler("setcertphoto", cmd_setcertphoto))
+    app.add_handler(CommandHandler("setaboutphoto", cmd_setaboutphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setaboutphoto"), cmd_setaboutphoto))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
     app.add_handler(CommandHandler("exportreviews", cmd_export_reviews))
@@ -981,6 +1017,7 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_faq_item,    pattern="^faq_"))
     app.add_handler(CallbackQueryHandler(cb_giveaway,    pattern="^cb_giveaway$"))
     app.add_handler(CallbackQueryHandler(cb_contact,     pattern="^cb_contact$"))
+    app.add_handler(CallbackQueryHandler(cb_about,       pattern="^cb_about$"))
 
     # Message handlers
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
