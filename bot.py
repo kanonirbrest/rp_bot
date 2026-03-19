@@ -269,9 +269,9 @@ async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"📞 Связаться с нами\n\n{PHONE}",
+        "📞 Связаться с нами",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -377,9 +377,9 @@ async def cmd_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"📞 Связаться с нами\n\n{PHONE}",
+        "📞 Связаться с нами",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -519,6 +519,7 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     if key in FAQ_WITH_CONTACT:
         buttons.insert(0, [
+            InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"),
             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}"),
         ])
     try:
@@ -538,9 +539,9 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.message.reply_text(
-        f"📞 Связаться с нами\n\n{PHONE}",
+        "📞 Связаться с нами",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
+            [InlineKeyboardButton("📞 Позвонить", url=f"tel:{PHONE}"), InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
