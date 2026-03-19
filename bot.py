@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import os
+import re
 
 from telegram import (
     InlineKeyboardButton,
@@ -13,7 +14,9 @@ from telegram import (
 )
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
+    ConversationHandler,
     ContextTypes,
     MessageHandler,
     filters,
@@ -28,37 +31,105 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MENU_EXHIBITION = "🎨 Выставка"
-MENU_ANNOUNCEMENTS = "📅 Ближайшие анонсы"
-MENU_DISCOUNTS = "🏷 Скидки"
-MENU_GIVEAWAY = "🎁 Розыгрыш"
+# ── Bottom keyboard ────────────────────────────────────────────────
+MENU_MAIN    = "🏠 Главное меню"
+MENU_OFFERS  = "💝 Специальные предложения"
+MENU_CONTACT = "📞 Связаться с нами"
+MENU_REVIEW  = "⭐ Оставить отзыв"
 
-MENU_BUTTONS = [MENU_EXHIBITION, MENU_ANNOUNCEMENTS, MENU_DISCOUNTS, MENU_GIVEAWAY]
+# ── Review conversation states ─────────────────────────────────────
+SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 
+# ── Constants ──────────────────────────────────────────────────────
+TICKET_URL   = "https://www.ticketpro.by/raznoe/neboreka---planeta-posle-shuma/"
+ABOUT_URL    = "https://dei.by/about"
+YANDEX_URL   = "https://yandex.by/maps/org/dom_eksperimentalnogo_iskusstva/1117789702/"
+PHONE        = "+375447383333"
+MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 
-def main_menu_keyboard() -> ReplyKeyboardMarkup:
+PROJECTS = [
+    "Небо.Река 2026",
+    "Дом Рождества 3.0",
+    "Путь.Напряжение",
+    "Небо.Река 2025",
+    "Дом Рождества 2.0",
+    "Дом Рождества 1:0",
+]
+
+ZONE_NAMES = {
+    1: "Луч с управлением",
+    2: "Письмо вспышка",
+    3: "Сколько лаванды ты весишь",
+    4: "Хождение по воде",
+}
+
+# ── Keyboards ──────────────────────────────────────────────────────
+def bottom_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        [
-            [MENU_EXHIBITION, MENU_ANNOUNCEMENTS],
-            [MENU_DISCOUNTS, MENU_GIVEAWAY],
-        ],
+        [[MENU_MAIN, MENU_OFFERS], [MENU_CONTACT, MENU_REVIEW]],
         resize_keyboard=True,
     )
 
 
-async def send_main_menu(update: Update, text: str) -> None:
-    await update.message.reply_text(text, reply_markup=main_menu_keyboard())
+def main_menu_inline() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('🎨 Выставка "Небо.Река"',       callback_data="cb_exhibition")],
+        [InlineKeyboardButton("💝 Специальные предложения",     callback_data="cb_offers")],
+        [InlineKeyboardButton("📅 Ближайшие анонсы",            callback_data="cb_announcements")],
+        [InlineKeyboardButton("🎁 Подарочные сертификаты",      callback_data="cb_certificates")],
+        [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
+        [InlineKeyboardButton("🎰 Розыгрыш",                    callback_data="cb_giveaway")],
+        [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
+        [InlineKeyboardButton("ℹ️ О RAZMAN production",         url=ABOUT_URL)],
+    ])
 
 
 def is_admin(user_id: int) -> bool:
     return user_id in config.ADMIN_IDS
 
 
+# ── Helpers ────────────────────────────────────────────────────────
+async def _send_main_menu_msg(update: Update):
+    text = (
+        "Ты в деле! RAZMAN production приветствует тебя в Клубе друзей!\n\n"
+        "Нажми на нужное действие 👇🏻"
+    )
+    try:
+        photo = await db.get_setting("main_photo")
+    except Exception:
+        photo = None
+    if photo:
+        await update.effective_message.reply_photo(
+            photo=photo, caption=text, reply_markup=main_menu_inline()
+        )
+    else:
+        await update.effective_message.reply_text(text, reply_markup=main_menu_inline())
+
+
+async def _send_offers_text(update: Update):
+    await update.effective_message.reply_text(
+        "🎁 Действующие акции:\n\n"
+        "1. Скидка 20% на билеты студентам и школьникам от 12 лет в будние дни "
+        "(при предъявлении подтверждающего документа)\n\n"
+        "2. Скидка 10% на билеты многодетным семьям "
+        "(при предъявлении удостоверения)\n\n"
+        "3. При покупке 5 и более билетов — 1 полёт на качелях включён в стоимость\n\n"
+        "4. Скидка 5% на билеты в одном чеке имениннику в день его рождения, "
+        "а также 3 дня после (при предъявлении паспорта)\n\n"
+        "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит."
+    )
+
+
+# ── Onboarding ─────────────────────────────────────────────────────
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if await db.user_exists(user.id):
-        await send_main_menu(update, f"👋 С возвращением, {user.first_name}! Выбери раздел 👇")
+        await update.message.reply_text(
+            f"👋 С возвращением, {user.first_name}!",
+            reply_markup=bottom_keyboard(),
+        )
+        await _send_main_menu_msg(update)
         return
 
     await db.add_user(
@@ -79,7 +150,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
-        "Добро пожаловать в Пространство «Небо Река».\n\n"
+        "Добро пожаловать в Клуб друзей RAZMAN production.\n\n"
         "📲 Поделись контактом и получи:\n\n"
         "✅ Скидки для участников\n"
         "✅ Анонсы мероприятий первым\n"
@@ -99,32 +170,84 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.save_phone(user.id, contact.phone_number)
     logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
 
-    await send_main_menu(update, "✅ Номер сохранён, спасибо! Выбери раздел 👇")
+    await update.message.reply_text(
+        "Спасибо, запишем тебя в телефонную книгу Razman Production — "
+        "теперь мы точно стали друзьями 🙂",
+        reply_markup=bottom_keyboard(),
+    )
+    await _send_offers_text(update)
+    await _send_main_menu_msg(update)
 
 
 async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await send_main_menu(update, "Хорошо, пропустим. Выбери раздел 👇")
-
-
-async def handle_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎨 Выставка «Небо Река»\n\n"
-        "📍 11 марта",
+        "Хорошо, пропустим!", reply_markup=bottom_keyboard()
+    )
+    await _send_main_menu_msg(update)
+
+
+# ── Bottom menu handlers ───────────────────────────────────────────
+async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_main_menu_msg(update)
+
+
+async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_offers_text(update)
+
+
+async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📞 Связаться с нами:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(
-                "🗺 Открыть карту выставки",
-                web_app=WebAppInfo(url="https://kanonirbrest.github.io/rp_bot/")
-            )]
+            [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}")],
+            [InlineKeyboardButton("✈️ Написать в ТГ",  url=f"https://t.me/{PHONE.replace('+', '')}")],
         ]),
     )
 
 
-async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ── Inline button callbacks ────────────────────────────────────────
+async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "«НЕБО.РЕКА» Планета после шума — иммерсивная медиа-выставка "
+        "и один из самых масштабных арт-проектов страны.\n\n"
+        "Команда Razman Production создала на площади 2300 м² в окружении 500 тонн воды "
+        "уникальный мир, где природа вдохновляет, технологии удивляют, живая музыка трогает.\n\n"
+        "«Небо.Река» выключает городскую «громкость» и возвращает чувствительность — "
+        "даёт возможность остановиться, выдохнуть и прожить редкий опыт присутствия «здесь и сейчас».\n\n"
+        "📅 21 марта — 23 августа\n"
+        "📍 DEI (Дом Экспериментального Искусства)\n"
+        "Минск, пр-т. Машерова 15/1\n\n"
+        "Подробности и билеты на сайте:"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
+        [InlineKeyboardButton("🗺 Открыть карту выставки",
+                              web_app=WebAppInfo(url=MAP_BASE_URL))],
+    ])
+    try:
+        photo = await db.get_setting("exhibition_photo")
+    except Exception:
+        photo = None
+    if photo:
+        await query.message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+    else:
+        await query.message.reply_text(text, reply_markup=kb)
+
+
+async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_offers_text(update)
+
+
+async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
     text = (
         "📅 Ближайшие анонсы\n\n"
-        "🎨 11 марта — Выставка «Небо река»\n\n"
-        "Открытие выставки, которую нельзя пропустить.\n"
-        "Приходи, зови друзей!"
+        "Следи за обновлениями — скоро здесь появится информация о новых событиях!"
     )
     try:
         photo = await db.get_setting("announcement_photo")
@@ -133,91 +256,319 @@ async def handle_announcements(update: Update, context: ContextTypes.DEFAULT_TYP
         photo = None
     try:
         if photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=text,
-                reply_markup=main_menu_keyboard(),
-            )
+            await query.message.reply_photo(photo=photo, caption=text)
         else:
-            await update.message.reply_text(
-                text,
-                reply_markup=main_menu_keyboard(),
-            )
+            await query.message.reply_text(text)
     except Exception as e:
-        logger.error("handle_announcements reply failed: %s", e)
+        logger.error("cb_announcements reply failed: %s", e)
 
 
-async def handle_discounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🏷 Скидки\n\n"
-        "Актуальные скидки и специальные предложения появятся здесь.",
-        reply_markup=main_menu_keyboard(),
+async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "🎁 Подарочные сертификаты\n\n"
+        "Самый лучший подарок — это впечатления! А если точная дата пока неизвестна, "
+        "мы сохраним её в секрете до нужного момента.\n\n"
+        "Приобретайте в кассе билеты с открытой датой на выставку «Небо.Река», "
+        "которые мы упакуем в красивый подарочный конверт, "
+        "чтобы момент дарения уже стал особенным ❤️"
     )
+    try:
+        photo = await db.get_setting("cert_photo")
+    except Exception:
+        photo = None
+    if photo:
+        await query.message.reply_photo(photo=photo, caption=text)
+    else:
+        await query.message.reply_text(text)
 
 
-async def handle_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+# ── FAQ ────────────────────────────────────────────────────────────
+FAQ_ANSWERS = {
+    "faq_buy": (
+        "🎟 Где и как купить билет\n\n"
+        "Есть три варианта покупки билетов:\n"
+        "• на сайте dei.by\n"
+        "• в кассе билетного оператора Ticketpro\n"
+        "• в кассе перед посещением\n\n"
+        "Обращаем внимание, что количество проданных билетов в час ограничено, "
+        "поэтому может возникнуть ситуация, что придётся ожидать на входе.\n\n"
+        "Рекомендуем приобретать билеты заранее на конкретную дату и время 🤍"
+    ),
+    "faq_return": (
+        "🔄 Вернуть / обменять билет\n\n"
+        "Возврат билетов осуществляется в кассе по адресу:\n"
+        "Минск, пр. Машерова, 15/1 (вход со двора).\n\n"
+        "Возврат возможен не менее чем за 24 часа до начала сеанса.\n\n"
+        "Если вы хотите перенести ваш визит, просим связаться с оператором:"
+    ),
+    "faq_notreceived": (
+        "📧 Билеты не пришли на почту\n\n"
+        "Билеты после оплаты приходят в течение часа.\n\n"
+        "Если прошло больше часа — проверьте папку «Спам» в почтовом ящике.\n\n"
+        "Если это не помогло, обратитесь в службу поддержки билетного оператора, "
+        "у которого вы приобретали билет."
+    ),
+    "faq_gift": (
+        "🎁 Купить билет в подарок\n\n"
+        "У нас в кассе можно приобрести билет с открытой датой, "
+        "который мы упакуем в красивый подарочный конверт."
+    ),
+    "faq_cantbuy": (
+        "❌ Не могу купить билет\n\n"
+        "— Не работает ссылка?\n"
+        "Скорее всего мы уже знаем о проблеме и стараемся оперативно её устранить.\n\n"
+        "— Нет билетов в наличии?\n"
+        "Скорее всего вы не нажали на цветной прямоугольник необходимой категории билета "
+        "(взрослый/детский/льготный).\n\n"
+        "Если проблема не решилась — свяжитесь с нами:"
+    ),
+    "faq_print": (
+        "🖨 Нужно ли печатать билет?\n\n"
+        "Билет печатать не обязательно.\n"
+        "Можно показать в электронном виде на входе."
+    ),
+}
+
+FAQ_WITH_CONTACT = {"faq_return", "faq_cantbuy"}
+
+
+async def cb_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎟 Где и как купить билет",     callback_data="faq_buy")],
+        [InlineKeyboardButton("🔄 Вернуть / обменять билет",  callback_data="faq_return")],
+        [InlineKeyboardButton("📧 Билеты не пришли на почту", callback_data="faq_notreceived")],
+        [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
+        [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
+        [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
+    ])
+    await query.message.reply_text("❓ Часто задаваемые вопросы\n\nВыбери вопрос:", reply_markup=kb)
+
+
+async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    key = query.data
+    text = FAQ_ANSWERS.get(key, "Ответ не найден.")
+    buttons = [[InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")]]
+    if key in FAQ_WITH_CONTACT:
+        buttons.insert(0, [
+            InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
+            InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}"),
+        ])
+    await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def cb_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user = query.from_user
     try:
         number = await db.get_giveaway_number(user.id)
         gif = await db.get_setting("giveaway_gif")
     except Exception as e:
-        logger.error("handle_giveaway db failed: %s", e)
+        logger.error("cb_giveaway db failed: %s", e)
         number = None
         gif = None
 
     if number:
         caption = (
-            "🎁 Розыгрыш\n\n"
+            f"🎰 Розыгрыш\n\n"
             f"Твой номер участника: № {number}\n\n"
             "Следи за объявлениями — победителя определим в прямом эфире!"
         )
     else:
-        caption = (
-            "🎁 Розыгрыш\n\n"
-            "Информация о текущих розыгрышах и условия участия будут здесь."
-        )
+        caption = "🎰 Розыгрыш\n\nИнформация о текущих розыгрышах и условия участия будут здесь."
 
     if gif:
-        await update.message.reply_animation(
-            animation=gif,
-            caption=caption,
-            reply_markup=main_menu_keyboard(),
-        )
+        await query.message.reply_animation(animation=gif, caption=caption)
     else:
-        await update.message.reply_text(
-            caption,
-            reply_markup=main_menu_keyboard(),
+        await query.message.reply_text(caption)
+
+
+# ── Review conversation ────────────────────────────────────────────
+async def review_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
+        await update.callback_query.answer()
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(p, callback_data=f"proj_{i}")]
+        for i, p in enumerate(PROJECTS)
+    ])
+    await update.effective_message.reply_text(
+        "Мы растём благодаря тебе 🌱 Расскажи, как прошел твой день на проекте: "
+        "что понравилось, а что стоит доработать? Мы слушаем, и становимся лучше ❤️\n\n"
+        "Выбери проект:",
+        reply_markup=kb,
+    )
+    return SELECT_PROJECT
+
+
+async def review_select_project(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    idx = int(query.data.replace("proj_", ""))
+    project = PROJECTS[idx]
+    context.user_data["review_project"] = project
+    context.user_data["review_proj_idx"] = idx
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⭐⭐⭐⭐⭐  Отлично — 5", callback_data="rate_5")],
+        [InlineKeyboardButton("⭐⭐⭐⭐  Хорошо — 4",   callback_data="rate_4")],
+        [InlineKeyboardButton("⭐⭐⭐  Так себе — 3",   callback_data="rate_3")],
+        [InlineKeyboardButton("⭐⭐  Плохо — 2",        callback_data="rate_2")],
+        [InlineKeyboardButton("⭐  Ужасно — 1",         callback_data="rate_1")],
+    ])
+    try:
+        photo = await db.get_setting(f"proj_photo_{idx}")
+    except Exception:
+        photo = None
+    text = f"Просим оценить {project}:"
+    if photo:
+        await query.message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+    else:
+        await query.message.reply_text(text, reply_markup=kb)
+    return RATE_PROJECT
+
+
+async def review_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    rating = int(query.data.replace("rate_", ""))
+    context.user_data["review_rating"] = rating
+
+    if rating >= 4:
+        await query.message.reply_text(
+            "От Вашей оценки на душе стало теплее! Поделитесь впечатлениями подробнее: "
+            "что тронуло, удивило, порадовало? Мы впитываем все ваши эмоции и открыты к новым идеям!\n\n"
+            "➡️ Пожалуйста, оставьте отзыв на Яндекс Картах — это займёт пару минут, но для нас очень важно! 🙏\n"
+            "Благодарим, что были с нами! Ждём новых встреч! 🤍",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📍 Отзыв на Яндекс Картах", url=YANDEX_URL)]
+            ]),
         )
 
+    await query.message.reply_text(
+        "Оставьте свой контактный e-mail (по желанию, если нужно связаться для уточнений).\n\n"
+        "Введите e-mail или нажмите «Пропустить»:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("Пропустить →", callback_data="skip_email")]
+        ]),
+    )
+    return ENTER_EMAIL
 
+
+async def review_enter_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
+        await update.callback_query.answer()
+        context.user_data["review_email"] = None
+        msg = update.callback_query.message
+    else:
+        context.user_data["review_email"] = update.message.text.strip()
+        msg = update.message
+    await msg.reply_text("Введите текст отзыва:")
+    return ENTER_TEXT
+
+
+async def review_enter_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    review_text = update.message.text.strip()
+    user = update.effective_user
+    project = context.user_data.get("review_project", "—")
+    rating  = context.user_data.get("review_rating", 0)
+    email   = context.user_data.get("review_email")
+
+    try:
+        await db.save_review(user.id, project, rating, email, review_text)
+    except Exception as e:
+        logger.error("save_review failed: %s", e)
+
+    admin_text = (
+        f"📝 Новый отзыв\n\n"
+        f"👤 {user.full_name} (@{user.username or '—'})\n"
+        f"🎨 Проект: {project}\n"
+        f"⭐ Оценка: {rating}/5\n"
+        f"📧 Email: {email or '—'}\n\n"
+        f"💬 {review_text}"
+    )
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await context.bot.send_message(chat_id=admin_id, text=admin_text)
+        except Exception:
+            pass
+
+    await update.message.reply_text(
+        "Благодарим, что были с нами! Ждём новых встреч! 🤍",
+        reply_markup=bottom_keyboard(),
+    )
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+async def review_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    if update.message:
+        await update.message.reply_text("Отзыв отменён.", reply_markup=bottom_keyboard())
+    return ConversationHandler.END
+
+
+# ── Admin commands ─────────────────────────────────────────────────
 async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     if not update.message.photo:
         await update.message.reply_text(
-            "Отправь фото вместе с командой /setphoto (прикрепи картинку и напиши команду в подписи)."
+            "Отправь фото с командой /setphoto в подписи (для раздела «Анонсы»)."
         )
         return
-
     file_id = update.message.photo[-1].file_id
     await db.set_setting("announcement_photo", file_id)
-    await update.message.reply_text("✅ Фото афиши обновлено!")
+    await update.message.reply_text("✅ Фото анонса обновлено!")
 
 
 async def cmd_setgif(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     if not update.message.animation:
-        await update.message.reply_text(
-            "Отправь GIF с командой /setgif в подписи."
-        )
+        await update.message.reply_text("Отправь GIF с командой /setgif в подписи.")
         return
-
     file_id = update.message.animation.file_id
     await db.set_setting("giveaway_gif", file_id)
     await update.message.reply_text("✅ GIF для розыгрыша обновлён!")
+
+
+async def cmd_setmainphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not update.message.photo:
+        await update.message.reply_text("Отправь фото с командой /setmainphoto в подписи.")
+        return
+    file_id = update.message.photo[-1].file_id
+    await db.set_setting("main_photo", file_id)
+    await update.message.reply_text("✅ Фото главного меню обновлено!")
+
+
+async def cmd_setexhibitionphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not update.message.photo:
+        await update.message.reply_text("Отправь фото с командой /setexhibitionphoto в подписи.")
+        return
+    file_id = update.message.photo[-1].file_id
+    await db.set_setting("exhibition_photo", file_id)
+    await update.message.reply_text("✅ Фото выставки обновлено!")
+
+
+async def cmd_setcertphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not update.message.photo:
+        await update.message.reply_text("Отправь фото с командой /setcertphoto в подписи.")
+        return
+    file_id = update.message.photo[-1].file_id
+    await db.set_setting("cert_photo", file_id)
+    await update.message.reply_text("✅ Фото сертификатов обновлено!")
 
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -231,7 +582,6 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("Нет пользователей для рассылки.")
         return
 
-    # определяем тип контента
     text = " ".join(context.args) if context.args else None
     has_photo = bool(msg.photo)
     has_animation = bool(msg.animation)
@@ -247,7 +597,6 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     caption = msg.caption.replace("/broadcast", "").strip() if msg.caption else None
-
     status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
 
     sent, failed = 0, 0
@@ -255,15 +604,11 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             if has_photo:
                 await context.bot.send_photo(
-                    chat_id=user_id,
-                    photo=msg.photo[-1].file_id,
-                    caption=caption,
+                    chat_id=user_id, photo=msg.photo[-1].file_id, caption=caption
                 )
             elif has_animation:
                 await context.bot.send_animation(
-                    chat_id=user_id,
-                    animation=msg.animation.file_id,
-                    caption=caption,
+                    chat_id=user_id, animation=msg.animation.file_id, caption=caption
                 )
             else:
                 await context.bot.send_message(chat_id=user_id, text=text)
@@ -273,29 +618,24 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(0.05)
 
     await status.edit_text(
-        f"✅ Рассылка завершена\n\n"
-        f"Отправлено: {sent}\n"
-        f"Не доставлено: {failed} (заблокировали бота)"
+        f"✅ Рассылка завершена\n\nОтправлено: {sent}\nНе доставлено: {failed}"
     )
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     stats = await db.get_stats()
     lines = [f"📊 Всего пользователей: *{stats['total']}*\n\nПоследние 5:"]
     for first_name, username, joined_at in stats["recent"]:
         uname = f"@{username}" if username else "—"
         lines.append(f"• {first_name} ({uname}) — {joined_at}")
-
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     csv_data = await db.export_csv()
     file = io.BytesIO(csv_data.encode("utf-8"))
     file.name = "contacts.csv"
@@ -305,75 +645,48 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     try:
         import qrcode
-
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}?start=qr"
-
         img = qrcode.make(url)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
-
         await update.message.reply_photo(
-            photo=buf,
-            caption=f"QR-код ведёт на: `{url}`",
-            parse_mode="Markdown",
+            photo=buf, caption=f"QR-код ведёт на: `{url}`", parse_mode="Markdown"
         )
     except ImportError:
-        await update.message.reply_text(
-            "Установи пакет: pip install qrcode[pil]"
-        )
-
-
-ZONE_NAMES = {
-    1: "Луч с управлением",
-    2: "Письмо вспышка",
-    3: "Сколько лаванды ты весишь",
-    4: "Хождение по воде",
-}
-
-MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
+        await update.message.reply_text("Установи пакет: pip install qrcode[pil]")
 
 
 async def cmd_qrzone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-
     try:
         import qrcode
-
         if not context.args or not context.args[0].isdigit():
             zones = "\n".join(f"{k} — {v}" for k, v in ZONE_NAMES.items())
-            await update.message.reply_text(
-                f"Использование: /qrzone <номер>\n\nЛокации:\n{zones}"
-            )
+            await update.message.reply_text(f"Использование: /qrzone <номер>\n\nЛокации:\n{zones}")
             return
-
         zone_id = int(context.args[0])
         if zone_id not in ZONE_NAMES:
             await update.message.reply_text("Номер локации: 1, 2, 3 или 4")
             return
-
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}/map?startapp={zone_id}"
         img = qrcode.make(url)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
-
         await update.message.reply_photo(
-            photo=buf,
-            caption=f"📍 Локация {zone_id}: {ZONE_NAMES[zone_id]}\n\n{url}",
+            photo=buf, caption=f"📍 Локация {zone_id}: {ZONE_NAMES[zone_id]}\n\n{url}"
         )
     except ImportError:
-        await update.message.reply_text(
-            "Установи пакет: pip install qrcode[pil]"
-        )
+        await update.message.reply_text("Установи пакет: pip install qrcode[pil]")
 
 
+# ── Main ───────────────────────────────────────────────────────────
 def main():
     if not config.BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN не задан в .env файле")
@@ -384,35 +697,73 @@ def main():
         await db.init_db()
 
     async def error_handler(update, context):
-        logger.error("Ошибка при обработке обновления: %s", context.error, exc_info=context.error)
+        logger.error("Ошибка: %s", context.error, exc_info=context.error)
 
     app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
     app.add_error_handler(error_handler)
 
+    # Review ConversationHandler — первым, чтобы перехватывал раньше других
+    review_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(review_start, pattern="^review_start$"),
+            MessageHandler(filters.Regex(rf"^{re.escape(MENU_REVIEW)}$"), review_start),
+        ],
+        states={
+            SELECT_PROJECT: [
+                CallbackQueryHandler(review_select_project, pattern=r"^proj_\d+$"),
+            ],
+            RATE_PROJECT: [
+                CallbackQueryHandler(review_rate, pattern=r"^rate_[1-5]$"),
+            ],
+            ENTER_EMAIL: [
+                CallbackQueryHandler(review_enter_email, pattern="^skip_email$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, review_enter_email),
+            ],
+            ENTER_TEXT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, review_enter_text),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", review_cancel)],
+    )
+    app.add_handler(review_conv)
+
+    # Commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(CommandHandler("qrzone", cmd_qrzone))
     app.add_handler(CommandHandler("setphoto", cmd_setphoto))
-    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(CommandHandler("setgif", cmd_setgif))
-    app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
+    app.add_handler(CommandHandler("setmainphoto", cmd_setmainphoto))
+    app.add_handler(CommandHandler("setexhibitionphoto", cmd_setexhibitionphoto))
+    app.add_handler(CommandHandler("setcertphoto", cmd_setcertphoto))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setmainphoto"), cmd_setmainphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setexhibitionphoto"), cmd_setexhibitionphoto))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setcertphoto"), cmd_setcertphoto))
+    app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(MessageHandler(
         (filters.PHOTO | filters.ANIMATION) & filters.CaptionRegex(r"(?i)/broadcast"),
         cmd_broadcast,
     ))
-    app.add_handler(CommandHandler("exhibition", handle_exhibition))
-    app.add_handler(CommandHandler("announcements", handle_announcements))
-    app.add_handler(CommandHandler("discounts", handle_discounts))
-    app.add_handler(CommandHandler("giveaway", handle_giveaway))
+
+    # Inline callbacks
+    app.add_handler(CallbackQueryHandler(cb_exhibition,  pattern="^cb_exhibition$"))
+    app.add_handler(CallbackQueryHandler(cb_offers,      pattern="^cb_offers$"))
+    app.add_handler(CallbackQueryHandler(cb_announcements, pattern="^cb_announcements$"))
+    app.add_handler(CallbackQueryHandler(cb_certificates, pattern="^cb_certificates$"))
+    app.add_handler(CallbackQueryHandler(cb_faq,         pattern="^cb_faq$"))
+    app.add_handler(CallbackQueryHandler(cb_faq_item,    pattern="^faq_"))
+    app.add_handler(CallbackQueryHandler(cb_giveaway,    pattern="^cb_giveaway$"))
+
+    # Message handlers
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.Regex(r"(?i)пропустить|skip"), handle_skip))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_EXHIBITION}$"), handle_exhibition))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_ANNOUNCEMENTS}$"), handle_announcements))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_DISCOUNTS}$"), handle_discounts))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{MENU_GIVEAWAY}$"), handle_giveaway))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu))
+    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_CONTACT)}$"), handle_contact_menu))
 
     webhook_url = config.WEBHOOK_URL
     port = int(os.environ.get("PORT", 8443))

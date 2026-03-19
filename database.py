@@ -75,6 +75,17 @@ async def init_db():
             value TEXT
         )
     """)
+    await _execute("""
+        CREATE TABLE IF NOT EXISTS reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            project TEXT,
+            rating INTEGER,
+            email TEXT,
+            text TEXT,
+            created_at TEXT
+        )
+    """)
     await assign_missing_giveaway_numbers()
 
 
@@ -157,6 +168,13 @@ async def get_stats() -> dict:
         for row in _rows(recent_result)
     ]
     return {"total": total, "recent": recent}
+
+
+async def save_review(user_id: int, project: str, rating: int, email: str | None, text: str):
+    await _execute(
+        "INSERT INTO reviews (user_id, project, rating, email, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [user_id, project, rating, email, text, datetime.now().isoformat(timespec="seconds")],
+    )
 
 
 async def export_csv() -> str:
