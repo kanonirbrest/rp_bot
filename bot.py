@@ -108,6 +108,12 @@ async def _send_main_menu_msg(update: Update):
         await update.effective_message.reply_text(text, reply_markup=main_menu_inline())
 
 
+def _map_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗺 Карта выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
+    ])
+
+
 async def _send_offers_text(update: Update):
     await update.effective_message.reply_text(
         "🎁 Действующие акции:\n\n"
@@ -118,7 +124,8 @@ async def _send_offers_text(update: Update):
         "3. При покупке 5 и более билетов — 1 полёт на качелях включён в стоимость\n\n"
         "4. Скидка 5% на билеты в одном чеке имениннику в день его рождения, "
         "а также 3 дня после (при предъявлении паспорта)\n\n"
-        "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит."
+        "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит.",
+        reply_markup=_map_kb(),
     )
 
 
@@ -205,6 +212,7 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}"),
              InlineKeyboardButton("✈️ Написать в ТГ",  url="https://t.me/DEI_by_RP")],
+            [InlineKeyboardButton("🗺 Карта выставки",  web_app=WebAppInfo(url=MAP_BASE_URL))],
         ]),
     )
 
@@ -249,9 +257,9 @@ async def _send_announcements(message):
         photo = None
     try:
         if photo:
-            await message.reply_photo(photo=photo, caption=text)
+            await message.reply_photo(photo=photo, caption=text, reply_markup=_map_kb())
         else:
-            await message.reply_text(text)
+            await message.reply_text(text, reply_markup=_map_kb())
     except Exception as e:
         logger.error("_send_announcements reply failed: %s", e)
 
@@ -270,9 +278,9 @@ async def _send_certificates(message):
     except Exception:
         photo = None
     if photo:
-        await message.reply_photo(photo=photo, caption=text)
+        await message.reply_photo(photo=photo, caption=text, reply_markup=_map_kb())
     else:
-        await message.reply_text(text)
+        await message.reply_text(text, reply_markup=_map_kb())
 
 
 async def _send_giveaway(message, user):
@@ -422,6 +430,7 @@ FAQ_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
     [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
     [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
+    [InlineKeyboardButton("🗺 Карта выставки",            web_app=WebAppInfo(url=MAP_BASE_URL))],
 ])
 
 
@@ -441,10 +450,13 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = FAQ_ANSWERS.get(key, "Ответ не найден.")
     if key in FAQ_WITH_CONTACT:
         text += f"\n\n{PHONE}"
-    buttons = [[InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")]]
+    buttons = [
+        [InlineKeyboardButton("🗺 Карта выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
+        [InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")],
+    ]
     if key in FAQ_WITH_CONTACT:
         buttons.insert(0, [
-            InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}"),
+            InlineKeyboardButton("✈️ Написать в ТГ", url="https://t.me/DEI_by_RP"),
         ])
     try:
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -467,6 +479,7 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
              InlineKeyboardButton("✈️ Написать в ТГ", url="https://t.me/DEI_by_RP")],
+            [InlineKeyboardButton("🗺 Карта выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
         ]),
     )
 
