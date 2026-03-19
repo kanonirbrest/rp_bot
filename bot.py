@@ -45,6 +45,7 @@ TICKET_URL   = "https://www.ticketpro.by/raznoe/neboreka---planeta-posle-shuma/"
 ABOUT_URL    = "https://dei.by/about"
 YANDEX_URL   = "https://yandex.ru/navi/org/37468561319?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
+TG_USERNAME  = "DEI_by_RP"
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 
 PROJECTS = [
@@ -53,7 +54,7 @@ PROJECTS = [
     "Путь.Напряжение",
     "Небо.Река 2025",
     "Дом Рождества 2.0",
-    "Дом Рождества 1:0",
+    "Дом Рождества 1.0",
 ]
 
 ZONE_NAMES = {
@@ -114,6 +115,30 @@ def _map_kb() -> InlineKeyboardMarkup:
     ])
 
 
+def _phone_request_keyboard(is_retry: bool = False) -> ReplyKeyboardMarkup:
+    skip_text = "Нет, не хочу" if is_retry else "Пропустить →"
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("📱 Поделиться номером", request_contact=True)],
+         [KeyboardButton(skip_text)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+async def _check_phone_gate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Проверяет, есть ли номер телефона. Если нет — показывает запрос и возвращает False."""
+    phone = await db.get_phone(update.effective_user.id)
+    if phone:
+        return True
+    context.user_data["phone_stage"] = "offers_1"
+    await update.effective_message.reply_text(
+        "💝 Специальные предложения доступны только для участников клуба.\n\n"
+        "Поделись номером телефона, чтобы продолжить:",
+        reply_markup=_phone_request_keyboard(is_retry=False),
+    )
+    return False
+
+
 async def _send_offers_text(update: Update):
     await update.effective_message.reply_text(
         "🎁 Действующие акции:\n\n"
@@ -125,7 +150,6 @@ async def _send_offers_text(update: Update):
         "4. Скидка 5% на билеты в одном чеке имениннику в день его рождения, "
         "а также 3 дня после (при предъявлении паспорта)\n\n"
         "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит.",
-        reply_markup=_map_kb(),
     )
 
 
@@ -152,14 +176,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info("Новый пользователь: %s (%s)", user.full_name, user.id)
 
-    keyboard = ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("📱 Поделиться номером", request_contact=True)],
-            [KeyboardButton("Пропустить →")],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
+    keyboard = _phone_request_keyboard(is_retry=False)
+    context.user_data["phone_stage"] = "onboarding_1"
     await update.message.reply_text(
         f"👋 Привет, {user.first_name}!\n\n"
         "Добро пожаловать в Клуб друзей RAZMAN production.\n\n"
@@ -180,6 +198,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await db.save_phone(user.id, contact.phone_number)
     logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
+    context.user_data.pop("phone_stage", None)
 
     await update.message.reply_text(
         "Спасибо, запишем тебя в телефонную книгу Razman Production — "
@@ -191,6 +210,46 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    stage = context.user_data.get("phone_stage", "")
+
+    if stage == "onboarding_1":
+        context.user_data["phone_stage"] = "onboarding_2"
+        await update.message.reply_text(
+            "Без номера телефона некоторые функции клуба будут недоступны.\n\n"
+            "Поделишься контактом?",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
+    if stage == "offers_1":
+        context.user_data["phone_stage"] = "offers_2"
+        await update.message.reply_text(
+            "Без подтверждённого номера раздел специальных предложений будет закрыт.\n\n"
+            "Поделишься контактом?",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
+    context.user_data.pop("phone_stage", None)
+    await update.message.reply_text(
+        "Хорошо, пропустим!", reply_markup=bottom_keyboard()
+    )
+    await _send_main_menu_msg(update)
+
+
+async def handle_final_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки «Нет, не хочу» — финальный отказ от номера."""
+    stage = context.user_data.pop("phone_stage", "")
+
+    if "offers" in stage:
+        await update.message.reply_text(
+            "Раздел специальных предложений доступен только для участников клуба "
+            "с подтверждённым номером телефона.",
+            reply_markup=bottom_keyboard(),
+        )
+        return
+
+    # onboarding_2 или любой другой контекст — пропускаем в главное меню
     await update.message.reply_text(
         "Хорошо, пропустим!", reply_markup=bottom_keyboard()
     )
@@ -203,6 +262,8 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_phone_gate(update, context):
+        return
     await _send_offers_text(update)
 
 
@@ -210,9 +271,8 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ",  url="https://t.me/DEI_by_RP")],
-            [InlineKeyboardButton("🗺 Карта выставки",  web_app=WebAppInfo(url=MAP_BASE_URL))],
+            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
+             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -312,13 +372,16 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_main_menu_msg(update)
 
 async def cmd_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_phone_gate(update, context):
+        return
     await _send_offers_text(update)
 
 async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}")],
+            [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
+             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -356,6 +419,8 @@ async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    if not await _check_phone_gate(update, context):
+        return
     await _send_offers_text(update)
 
 
@@ -456,7 +521,7 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     if key in FAQ_WITH_CONTACT:
         buttons.insert(0, [
-            InlineKeyboardButton("✈️ Написать в ТГ", url="https://t.me/DEI_by_RP"),
+            InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}"),
         ])
     try:
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -478,8 +543,7 @@ async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ", url="https://t.me/DEI_by_RP")],
-            [InlineKeyboardButton("🗺 Карта выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
+             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}")],
         ]),
     )
 
@@ -792,16 +856,17 @@ def main():
         await db.init_db()
         await application.bot.set_my_commands([
             # — нижняя панель —
-            ("menu",          "🏠 Главное меню"),
-            ("offers",        "💝 Специальные предложения"),
-            ("contact",       "📞 Связаться с нами"),
-            ("review",        "⭐️ Оставить отзыв"),
+            ("menu",          "Главное меню 🏠"),
+            ("offers",        "Специальные предложения 💝"),
+            ("contact",       "Связаться с нами 📞"),
+            ("review",        "Оставить отзыв ⭐️"),
             # — разделы основного меню —
-            ("exhibition",    "🖼 Выставка «Небо.Река»"),
-            ("announcements", "📅 Ближайшие анонсы"),
-            ("certificates",  "🎀 Подарочные сертификаты"),
-            ("faq",           "❓ Часто задаваемые вопросы"),
-            ("map",           "🗺 Карта выставки"),
+            ("exhibition",    "Выставка «Небо.Река» 🖼"),
+            ("announcements", "Ближайшие анонсы 📅"),
+            ("certificates",  "Подарочные сертификаты 🎀"),
+            ("faq",           "Часто задаваемые вопросы ❓"),
+            ("giveaway",      "Розыгрыш 🎲"),
+            ("map",           "Карта выставки 🗺"),
         ])
 
     async def error_handler(update, context):
@@ -833,6 +898,7 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", review_cancel),
+            MessageHandler(filters.Regex(r"^Нет, не хочу$"),               handle_final_skip),
             MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu),
             MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu),
             MessageHandler(filters.Regex(rf"^{re.escape(MENU_CONTACT)}$"), handle_contact_menu),
@@ -885,6 +951,7 @@ def main():
 
     # Message handlers
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+    app.add_handler(MessageHandler(filters.Regex(r"^Нет, не хочу$"), handle_final_skip))
     app.add_handler(MessageHandler(filters.Regex(r"(?i)пропустить|skip"), handle_skip))
     app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu))
     app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu))
