@@ -79,9 +79,9 @@ def main_menu_inline() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📅 Ближайшие анонсы",            callback_data="cb_announcements")],
         [InlineKeyboardButton("🎁 Подарочные сертификаты",      callback_data="cb_certificates")],
         [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
-        [InlineKeyboardButton("🎰 Розыгрыш",                    callback_data="cb_giveaway")],
         [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
         [InlineKeyboardButton("ℹ️ О RAZMAN production",         url=ABOUT_URL)],
+        [InlineKeyboardButton("🗺 Карта выставки",              web_app=WebAppInfo(url=MAP_BASE_URL))],
     ])
 
 
@@ -763,15 +763,17 @@ def main():
     async def post_init(application):
         await db.init_db()
         await application.bot.set_my_commands([
+            # — нижняя панель —
             ("menu",          "🏠 Главное меню"),
+            ("offers",        "💝 Специальные предложения"),
+            ("contact",       "📞 Связаться с нами"),
+            ("review",        "⭐️ Оставить отзыв"),
+            # — разделы основного меню —
             ("exhibition",    "🖼 Выставка «Небо.Река»"),
-            ("offers",        "🎁 Специальные предложения"),
             ("announcements", "📅 Ближайшие анонсы"),
             ("certificates",  "🎀 Подарочные сертификаты"),
             ("faq",           "❓ Часто задаваемые вопросы"),
             ("giveaway",      "🎲 Розыгрыш"),
-            ("review",        "⭐️ Оставить отзыв"),
-            ("contact",       "📞 Связаться с нами"),
             ("map",           "🗺 Карта выставки"),
         ])
 
