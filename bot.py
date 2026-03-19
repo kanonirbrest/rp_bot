@@ -203,7 +203,7 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📞 Позвонить",       url=f"tel:{PHONE}"),
-             InlineKeyboardButton("✈️ Написать в ТГ",  url=f"https://t.me/{PHONE.replace('+', '')}")],
+             InlineKeyboardButton("✈️ Написать в ТГ",  url="https://t.me/DEI_by_RP")],
         ]),
     )
 
