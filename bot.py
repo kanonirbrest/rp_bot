@@ -67,6 +67,7 @@ ZONE_NAMES = {
 def bottom_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [[MENU_MAIN, MENU_OFFERS], [MENU_CONTACT, MENU_REVIEW]],
+        is_persistent=True,
         resize_keyboard=True,
     )
 
