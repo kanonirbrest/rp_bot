@@ -43,7 +43,7 @@ SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 # ── Constants ──────────────────────────────────────────────────────
 TICKET_URL   = "https://www.ticketpro.by/raznoe/neboreka---planeta-posle-shuma/"
 ABOUT_URL    = "https://dei.by/about"
-YANDEX_URL   = "https://yandex.by/maps/org/dom_eksperimentalnogo_iskusstva/1117789702/"
+YANDEX_URL   = "https://yandex.ru/navi/org/37468561319?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 
