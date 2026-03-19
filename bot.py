@@ -798,6 +798,36 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_document(document=file, filename="contacts.csv")
 
 
+async def cmd_reviews(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    reviews = await db.get_reviews(limit=10)
+    if not reviews:
+        await update.message.reply_text("Отзывов пока нет.")
+        return
+    stars = {5: "⭐⭐⭐⭐⭐", 4: "⭐⭐⭐⭐", 3: "⭐⭐⭐", 2: "⭐⭐", 1: "⭐"}
+    lines = [f"📝 Последние {len(reviews)} отзывов:\n"]
+    for r in reviews:
+        rating_str = stars.get(r["rating"], str(r["rating"]))
+        email_str = f"\n📧 {r['email']}" if r.get("email") else ""
+        lines.append(
+            f"{rating_str} {r['project']}\n"
+            f"{r['text']}"
+            f"{email_str}\n"
+            f"🕐 {r['created_at']}\n"
+            f"{'—'*20}"
+        )
+    await update.message.reply_text("\n".join(lines))
+
+
+async def cmd_export_reviews(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    csv_data = await db.export_reviews_csv()
+    file = io.BytesIO(csv_data.encode("utf-8"))
+    await update.message.reply_document(document=file, filename="reviews.csv")
+
+
 async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -926,6 +956,8 @@ def main():
     app.add_handler(CommandHandler("setexhibitionphoto", cmd_setexhibitionphoto))
     app.add_handler(CommandHandler("setcertphoto", cmd_setcertphoto))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(CommandHandler("reviews", cmd_reviews))
+    app.add_handler(CommandHandler("exportreviews", cmd_export_reviews))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setmainphoto"), cmd_setmainphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setexhibitionphoto"), cmd_setexhibitionphoto))

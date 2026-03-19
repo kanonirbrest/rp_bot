@@ -185,6 +185,26 @@ async def save_review(user_id: int, project: str, rating: int, email: str | None
     )
 
 
+async def get_reviews(limit: int = 20) -> list:
+    result = await _execute(
+        "SELECT project, rating, email, text, created_at FROM reviews ORDER BY id DESC LIMIT ?",
+        [limit],
+    )
+    return _rows(result)
+
+
+async def export_reviews_csv() -> str:
+    result = await _execute(
+        "SELECT project, rating, email, text, created_at FROM reviews ORDER BY id DESC"
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["project", "rating", "email", "text", "created_at"])
+    for row in _rows(result):
+        writer.writerow([row["project"], row["rating"], row["email"], row["text"], row["created_at"]])
+    return output.getvalue()
+
+
 async def export_csv() -> str:
     result = await _execute(
         "SELECT user_id, username, first_name, last_name, phone, joined_at FROM users ORDER BY id"
