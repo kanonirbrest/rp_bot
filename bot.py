@@ -292,7 +292,6 @@ async def _send_exhibition(message):
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
-        [InlineKeyboardButton("🗺 Открыть карту выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
     ])
     try:
         photo = await db.get_setting("exhibition_photo")
@@ -493,7 +492,6 @@ FAQ_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
     [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
     [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
-    [InlineKeyboardButton("🗺 Карта выставки",            web_app=WebAppInfo(url=MAP_BASE_URL))],
 ])
 
 
@@ -514,7 +512,6 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if key in FAQ_WITH_CONTACT:
         text += f"\n\n{PHONE}"
     buttons = [
-        [InlineKeyboardButton("🗺 Карта выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
         [InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")],
     ]
     if key in FAQ_WITH_CONTACT:
