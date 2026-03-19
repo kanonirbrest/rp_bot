@@ -805,7 +805,13 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, review_enter_text),
             ],
         },
-        fallbacks=[CommandHandler("cancel", review_cancel)],
+        fallbacks=[
+            CommandHandler("cancel", review_cancel),
+            MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu),
+            MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu),
+            MessageHandler(filters.Regex(rf"^{re.escape(MENU_CONTACT)}$"), handle_contact_menu),
+            MessageHandler(filters.Regex(rf"^{re.escape(MENU_REVIEW)}$"),  review_cancel),
+        ],
     )
     app.add_handler(review_conv)
 
