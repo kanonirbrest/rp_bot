@@ -360,15 +360,17 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     key = query.data
     text = FAQ_ANSWERS.get(key, "Ответ не найден.")
+    if key in FAQ_WITH_CONTACT:
+        text += f"\n\n{PHONE}"
     buttons = [[InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")]]
     if key in FAQ_WITH_CONTACT:
         buttons.insert(0, [
-            InlineKeyboardButton("📞 Позвонить",      url=f"tel:{PHONE}"),
             InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}"),
         ])
     try:
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
-    except Exception:
+    except Exception as e:
+        logger.error("cb_faq_item edit failed: %s", e)
         await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
