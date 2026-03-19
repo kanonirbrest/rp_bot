@@ -205,10 +205,8 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
-# ── Inline button callbacks ────────────────────────────────────────
-async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+# ── Section senders (reused by inline callbacks and slash commands) ─
+async def _send_exhibition(message):
     text = (
         "«НЕБО.РЕКА» Планета после шума — иммерсивная медиа-выставка "
         "и один из самых масштабных арт-проектов страны.\n\n"
@@ -223,28 +221,19 @@ async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
-        [InlineKeyboardButton("🗺 Открыть карту выставки",
-                              web_app=WebAppInfo(url=MAP_BASE_URL))],
+        [InlineKeyboardButton("🗺 Открыть карту выставки", web_app=WebAppInfo(url=MAP_BASE_URL))],
     ])
     try:
         photo = await db.get_setting("exhibition_photo")
     except Exception:
         photo = None
     if photo:
-        await query.message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
     else:
-        await query.message.reply_text(text, reply_markup=kb)
+        await message.reply_text(text, reply_markup=kb)
 
 
-async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await _send_offers_text(update)
-
-
-async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def _send_announcements(message):
     text = (
         "📅 Ближайшие анонсы\n\n"
         "Следи за обновлениями — скоро здесь появится информация о новых событиях!"
@@ -256,16 +245,14 @@ async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo = None
     try:
         if photo:
-            await query.message.reply_photo(photo=photo, caption=text)
+            await message.reply_photo(photo=photo, caption=text)
         else:
-            await query.message.reply_text(text)
+            await message.reply_text(text)
     except Exception as e:
-        logger.error("cb_announcements reply failed: %s", e)
+        logger.error("_send_announcements reply failed: %s", e)
 
 
-async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def _send_certificates(message):
     text = (
         "🎁 Подарочные сертификаты\n\n"
         "Самый лучший подарок — это впечатления! А если точная дата пока неизвестна, "
@@ -279,9 +266,97 @@ async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         photo = None
     if photo:
-        await query.message.reply_photo(photo=photo, caption=text)
+        await message.reply_photo(photo=photo, caption=text)
     else:
-        await query.message.reply_text(text)
+        await message.reply_text(text)
+
+
+async def _send_giveaway(message, user):
+    try:
+        number = await db.get_giveaway_number(user.id)
+        gif = await db.get_setting("giveaway_gif")
+    except Exception as e:
+        logger.error("_send_giveaway db failed: %s", e)
+        number = None
+        gif = None
+
+    if number:
+        caption = (
+            f"🎰 Розыгрыш\n\n"
+            f"Твой номер участника: № {number}\n\n"
+            "Следи за объявлениями — победителя определим в прямом эфире!"
+        )
+    else:
+        caption = "🎰 Розыгрыш\n\nИнформация о текущих розыгрышах и условия участия будут здесь."
+
+    if gif:
+        await message.reply_animation(animation=gif, caption=caption)
+    else:
+        await message.reply_text(caption)
+
+
+# ── Slash-command shortcuts ────────────────────────────────────────
+async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_main_menu_msg(update)
+
+async def cmd_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_offers_text(update)
+
+async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        f"📞 Связаться с нами\n\n{PHONE}",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{PHONE.replace('+', '')}")],
+        ]),
+    )
+
+async def cmd_exhibition_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_exhibition(update.effective_message)
+
+async def cmd_announcements_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_announcements(update.effective_message)
+
+async def cmd_certificates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_certificates(update.effective_message)
+
+async def cmd_faq_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(FAQ_LIST_TEXT, reply_markup=FAQ_KB)
+
+async def cmd_giveaway_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_giveaway(update.effective_message, update.effective_user)
+
+async def cmd_map_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🗺 Карта выставки",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("Открыть карту", web_app=WebAppInfo(url=MAP_BASE_URL))],
+        ]),
+    )
+
+
+# ── Inline button callbacks ────────────────────────────────────────
+async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_exhibition(query.message)
+
+
+async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_offers_text(update)
+
+
+async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_announcements(query.message)
+
+
+async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _send_certificates(query.message)
 
 
 # ── FAQ ────────────────────────────────────────────────────────────
@@ -377,28 +452,7 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user = query.from_user
-    try:
-        number = await db.get_giveaway_number(user.id)
-        gif = await db.get_setting("giveaway_gif")
-    except Exception as e:
-        logger.error("cb_giveaway db failed: %s", e)
-        number = None
-        gif = None
-
-    if number:
-        caption = (
-            f"🎰 Розыгрыш\n\n"
-            f"Твой номер участника: № {number}\n\n"
-            "Следи за объявлениями — победителя определим в прямом эфире!"
-        )
-    else:
-        caption = "🎰 Розыгрыш\n\nИнформация о текущих розыгрышах и условия участия будут здесь."
-
-    if gif:
-        await query.message.reply_animation(animation=gif, caption=caption)
-    else:
-        await query.message.reply_text(caption)
+    await _send_giveaway(query.message, query.from_user)
 
 
 # ── Review conversation ────────────────────────────────────────────
@@ -707,6 +761,18 @@ def main():
 
     async def post_init(application):
         await db.init_db()
+        await application.bot.set_my_commands([
+            ("menu",          "🏠 Главное меню"),
+            ("exhibition",    "🖼 Выставка «Небо.Река»"),
+            ("offers",        "🎁 Специальные предложения"),
+            ("announcements", "📅 Ближайшие анонсы"),
+            ("certificates",  "🎀 Подарочные сертификаты"),
+            ("faq",           "❓ Часто задаваемые вопросы"),
+            ("giveaway",      "🎲 Розыгрыш"),
+            ("review",        "⭐️ Оставить отзыв"),
+            ("contact",       "📞 Связаться с нами"),
+            ("map",           "🗺 Карта выставки"),
+        ])
 
     async def error_handler(update, context):
         logger.error("Ошибка: %s", context.error, exc_info=context.error)
@@ -740,7 +806,17 @@ def main():
     app.add_handler(review_conv)
 
     # Commands
-    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("start",         cmd_start))
+    app.add_handler(CommandHandler("menu",          cmd_menu))
+    app.add_handler(CommandHandler("exhibition",    cmd_exhibition_cmd))
+    app.add_handler(CommandHandler("offers",        cmd_offers_cmd))
+    app.add_handler(CommandHandler("announcements", cmd_announcements_cmd))
+    app.add_handler(CommandHandler("certificates",  cmd_certificates_cmd))
+    app.add_handler(CommandHandler("faq",           cmd_faq_cmd))
+    app.add_handler(CommandHandler("giveaway",      cmd_giveaway_cmd))
+    app.add_handler(CommandHandler("review",        review_start))
+    app.add_handler(CommandHandler("contact",       cmd_contact_cmd))
+    app.add_handler(CommandHandler("map",           cmd_map_cmd))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("qr", cmd_qr))
