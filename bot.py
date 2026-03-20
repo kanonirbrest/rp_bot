@@ -672,20 +672,6 @@ async def review_enter_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("save_review failed: %s", e)
 
-    admin_text = (
-        f"📝 Новый отзыв\n\n"
-        f"👤 {user.full_name} (@{user.username or '—'})\n"
-        f"🎨 Проект: {project}\n"
-        f"⭐ Оценка: {rating}/5\n"
-        f"📧 Email: {email or '—'}\n\n"
-        f"💬 {review_text}"
-    )
-    for admin_id in config.ADMIN_IDS:
-        try:
-            await context.bot.send_message(chat_id=admin_id, text=admin_text)
-        except Exception:
-            pass
-
     await update.message.reply_text(
         "Благодарим, что были с нами! Ждём новых встреч! 🤍",
         reply_markup=bottom_keyboard(),
