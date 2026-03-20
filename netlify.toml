@@ -1,3 +1,7 @@
 [build]
   publish = "docs"
-  ignore = "exit 0"
+  command = ""
+
+[build.environment]
+  PYTHON_VERSION = ""
+  NODE_VERSION = "18"
