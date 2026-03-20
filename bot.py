@@ -770,6 +770,13 @@ async def cmd_setaboutphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Фото раздела «О RAZMAN production» обновлено!")
 
 
+async def cmd_clearaboutphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    await db.set_setting("about_photo", "")
+    await update.message.reply_text("✅ Фото раздела «О RAZMAN production» удалено.")
+
+
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -1000,6 +1007,7 @@ def main():
     app.add_handler(CommandHandler("setexhibitionphoto", cmd_setexhibitionphoto))
     app.add_handler(CommandHandler("setcertphoto", cmd_setcertphoto))
     app.add_handler(CommandHandler("setaboutphoto", cmd_setaboutphoto))
+    app.add_handler(CommandHandler("clearaboutphoto", cmd_clearaboutphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setaboutphoto"), cmd_setaboutphoto))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
