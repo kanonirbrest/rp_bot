@@ -759,9 +759,9 @@ function zoomToZone(zone) {
   const rawTx = outerW / 2 - MARGIN - cx * S + scrollLeft;
   const rawTy = mapH   / 2 - cy * S;
 
-  // clamp so map edges never go beyond the viewport
-  const tx = Math.min(-MARGIN, Math.max(outerW - MARGIN - MAP_W * S, rawTx));
-  const ty = Math.min(0,       Math.max(mapH   * (1 - S),            rawTy));
+  // clamp so map edges never go beyond the viewport (scrollLeft factored in)
+  const tx = Math.min(scrollLeft - MARGIN, Math.max(outerW - MARGIN - MAP_W * S + scrollLeft, rawTx));
+  const ty = Math.min(0,                   Math.max(mapH * (1 - S),                           rawTy));
 
   mapOuter.style.overflowX = 'hidden';
   mapInner.style.transform = `translate(${tx}px, ${ty}px) scale(${S})`;
