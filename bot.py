@@ -37,6 +37,12 @@ MENU_OFFERS  = "Специальные предложения"
 MENU_CONTACT = "Связаться с нами"
 MENU_REVIEW  = "Оставить отзыв"
 
+# Регексы для кнопок — принимают и старый вариант с эмодзи, и новый без
+RE_MENU_MAIN    = r".*(Главное меню).*"
+RE_MENU_OFFERS  = r".*(Специальные предложения).*"
+RE_MENU_CONTACT = r".*(Связаться с нами).*"
+RE_MENU_REVIEW  = r".*(Оставить отзыв).*"
+
 # ── Review conversation states ─────────────────────────────────────
 SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 
@@ -960,7 +966,7 @@ def main():
     review_conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(review_start, pattern="^review_start$"),
-            MessageHandler(filters.Regex(rf"^{re.escape(MENU_REVIEW)}$"), review_start),
+            MessageHandler(filters.Regex(RE_MENU_REVIEW), review_start),
         ],
         states={
             SELECT_PROJECT: [
@@ -980,10 +986,10 @@ def main():
         fallbacks=[
             CommandHandler("cancel", review_cancel),
             MessageHandler(filters.Regex(r"^Нет, не хочу$"),               handle_final_skip),
-            MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu),
-            MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu),
-            MessageHandler(filters.Regex(rf"^{re.escape(MENU_CONTACT)}$"), handle_contact_menu),
-            MessageHandler(filters.Regex(rf"^{re.escape(MENU_REVIEW)}$"),  review_cancel),
+            MessageHandler(filters.Regex(RE_MENU_MAIN),    handle_main_menu),
+            MessageHandler(filters.Regex(RE_MENU_OFFERS),  handle_offers_menu),
+            MessageHandler(filters.Regex(RE_MENU_CONTACT), handle_contact_menu),
+            MessageHandler(filters.Regex(RE_MENU_REVIEW),  review_cancel),
         ],
     )
     app.add_handler(review_conv)
@@ -1041,9 +1047,9 @@ def main():
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.Regex(r"^Нет, не хочу$"), handle_final_skip))
     app.add_handler(MessageHandler(filters.Regex(r"(?i)пропустить|skip"), handle_skip))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_MAIN)}$"),    handle_main_menu))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_OFFERS)}$"),  handle_offers_menu))
-    app.add_handler(MessageHandler(filters.Regex(rf"^{re.escape(MENU_CONTACT)}$"), handle_contact_menu))
+    app.add_handler(MessageHandler(filters.Regex(RE_MENU_MAIN),    handle_main_menu))
+    app.add_handler(MessageHandler(filters.Regex(RE_MENU_OFFERS),  handle_offers_menu))
+    app.add_handler(MessageHandler(filters.Regex(RE_MENU_CONTACT), handle_contact_menu))
 
     webhook_url = config.WEBHOOK_URL
     port = int(os.environ.get("PORT", 8443))
