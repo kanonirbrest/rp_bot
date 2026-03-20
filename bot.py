@@ -494,12 +494,12 @@ FAQ_WITH_CONTACT = {"faq_return", "faq_cantbuy"}
 FAQ_LIST_TEXT = "❓ Часто задаваемые вопросы\n\nВыбери вопрос:"
 
 FAQ_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🎟 Где и как купить билет",     callback_data="faq_buy")],
-    [InlineKeyboardButton("🔄 Вернуть / обменять билет",  callback_data="faq_return")],
-    [InlineKeyboardButton("📧 Билеты не пришли на почту", callback_data="faq_notreceived")],
-    [InlineKeyboardButton("🎁 Купить билет в подарок",    callback_data="faq_gift")],
-    [InlineKeyboardButton("❌ Не могу купить билет",      callback_data="faq_cantbuy")],
-    [InlineKeyboardButton("🖨 Нужно ли печатать билет?",  callback_data="faq_print")],
+    [InlineKeyboardButton("Где и как купить билет 🎟",     callback_data="faq_buy")],
+    [InlineKeyboardButton("Вернуть / обменять билет 🔄",  callback_data="faq_return")],
+    [InlineKeyboardButton("Билеты не пришли на почту 📧", callback_data="faq_notreceived")],
+    [InlineKeyboardButton("Купить билет в подарок 🎁",    callback_data="faq_gift")],
+    [InlineKeyboardButton("Не могу купить билет ❌",      callback_data="faq_cantbuy")],
+    [InlineKeyboardButton("Нужно ли печатать билет? 🖨",  callback_data="faq_print")],
 ])
 
 
