@@ -52,7 +52,7 @@ ABOUT_URL    = "https://dei.by/about"
 YANDEX_URL   = "https://yandex.ru/navi/org/37468561319?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
 TG_USERNAME  = "DEI_by_RP"
-MAP_BASE_URL = "https://razman-production.netlify.app/"
+MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 
 PROJECTS = [
     "Небо.Река 2026",
