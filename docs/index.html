@@ -76,6 +76,34 @@
       letter-spacing: .18em;
     }
 
+    /* ── Floor switcher ── */
+    .floor-switcher {
+      display: flex;
+      gap: 6px;
+      padding: 10px 14px 6px;
+      align-self: flex-start;
+    }
+    .fsw {
+      padding: 6px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: var(--muted);
+      font-size: .6rem;
+      font-weight: 700;
+      letter-spacing: .14em;
+      cursor: pointer;
+      transition: background .18s, color .18s, border-color .18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fsw.active {
+      background: rgba(255,255,255,.15);
+      border-color: rgba(255,255,255,.3);
+      color: var(--text);
+    }
+
     /* ── Map ── */
     .map-hint {
       font-size: .58rem;
@@ -101,6 +129,7 @@
       transition: transform 1.3s cubic-bezier(.4,0,.2,1);
       border-radius: 10px;
       overflow: hidden;
+      /* background: #fff; */
     }
     .floor-img {
       position: absolute;
@@ -111,6 +140,7 @@
       object-position: center;
       display: block;
     }
+    .dots-layer { z-index: 2; }
     .dots-layer {
       position: absolute;
       inset: 0;
@@ -255,7 +285,10 @@
   <p>ПЛАН ВЫСТАВКИ · 23 ЗОНЫ</p>
 </header>
 
-<div class="map-hint">← прокрути карту →</div>
+<div class="floor-switcher">
+  <button class="fsw" data-floor="1">1 ЭТАЖ</button>
+  <button class="fsw" data-floor="2">2 ЭТАЖ</button>
+</div>
 
 <div class="map-outer">
   <div class="map-inner">
@@ -272,7 +305,7 @@
   <div class="info-empty">Нажми на зону, чтобы узнать подробнее</div>
 </div>
 
-<div class="sec-title">ВСЕ ЗОНЫ</div>
+<div class="sec-title" id="sec-title">ВСЕ ЗОНЫ</div>
 <div class="zones-list" id="zlist"></div>
 
 <script>
@@ -730,11 +763,49 @@ const ZONES = [
 const C = { c1:'var(--c1)', c2:'var(--c2)', c3:'var(--c3)', c4:'var(--c4)', c5:'var(--c5)', c6:'var(--c6)' };
 
 let active = null;
-const infoEl = document.getElementById('info');
-const dotsEl = document.getElementById('dots');
-const zlistEl = document.getElementById('zlist');
-const mapInner = document.querySelector('.map-inner');
-const mapOuter = document.querySelector('.map-outer');
+let currentFloor = null; // null = все этажи
+const infoEl    = document.getElementById('info');
+const dotsEl    = document.getElementById('dots');
+const zlistEl   = document.getElementById('zlist');
+const secTitle  = document.getElementById('sec-title');
+const mapInner  = document.querySelector('.map-inner');
+const mapOuter  = document.querySelector('.map-outer');
+
+function applyFloor(floor) {
+  currentFloor = floor;
+  secTitle.textContent = floor ? `ЗОНЫ · ${floor} ЭТАЖ` : 'ВСЕ ЗОНЫ';
+  document.querySelectorAll('.fsw').forEach(b =>
+    b.classList.toggle('active', floor !== null && +b.dataset.floor === floor));
+
+  // сбросить выбранную зону если она не на этом этаже
+  if (active !== null && floor !== null) {
+    const isFloor2 = PINK_ZONES.has(active);
+    if ((floor === 2) !== isFloor2) {
+      active = null;
+      document.querySelectorAll('.zdot,.zitem').forEach(el => el.classList.remove('active'));
+      infoEl.style.borderColor = '';
+      infoEl.innerHTML = '<div class="info-empty">Нажми на зону, чтобы узнать подробнее</div>';
+      zoomToZone(null);
+    }
+  }
+
+  document.querySelectorAll('.zdot').forEach(el => {
+    const id = +el.dataset.id;
+    el.style.display = (floor === null || PINK_ZONES.has(id) === (floor === 2)) ? '' : 'none';
+  });
+  document.querySelectorAll('.zitem').forEach(el => {
+    const id = +el.dataset.id;
+    el.style.display = (floor === null || PINK_ZONES.has(id) === (floor === 2)) ? '' : 'none';
+  });
+}
+
+document.querySelectorAll('.fsw').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const floor = +btn.dataset.floor;
+    // повторный клик снимает фильтр
+    applyFloor(currentFloor === floor ? null : floor);
+  });
+});
 
 
 const ZOOM_SCALE = 1.15;
@@ -843,11 +914,15 @@ mapInner.addEventListener('click', e => {
   if (active !== null && !e.target.closest('.zdot')) select(active);
 });
 
+// по умолчанию показываем все зоны
+applyFloor(null);
+
 // auto-open zone from Telegram startapp param or ?zone=
 const tgParam  = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
 const urlZone  = parseInt(tgParam || new URLSearchParams(location.search).get('zone'));
-if (urlZone >= 1 && urlZone <= 23) {
+if (urlZone >= 1 && urlZone <= 22) {
   setTimeout(() => {
+    applyFloor(PINK_ZONES.has(urlZone) ? 2 : 1);
     select(urlZone);
     infoEl.scrollIntoView({ behavior:'smooth', block:'start' });
   }, 600);
