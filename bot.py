@@ -644,6 +644,8 @@ async def review_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ENTER_TEXT
 
     await query.message.reply_text(
+        "Спасибо, что не прошли мимо! Ваша обратная связь — самый честный способ сделать будущие проекты лучше и комфортнее. "
+        "Поделитесь своими мыслями и предложениями — ваше мнение бесценно! 🙏\n\n"
         "Оставьте свой контактный e-mail (по желанию, если нужно связаться для уточнений).\n\n"
         "Введите e-mail или нажмите «Пропустить»:",
         reply_markup=InlineKeyboardMarkup([
