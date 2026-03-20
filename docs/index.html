@@ -94,8 +94,8 @@
     .map-outer::-webkit-scrollbar { display: none; }
     .map-inner {
       position: relative;
-      width: 984px;
-      height: 444px;
+      width: 787px;
+      height: 355px;
       margin: 0 14px;
       transform-origin: 0 0;
       transition: transform .65s cubic-bezier(.4,0,.2,1);
@@ -740,7 +740,7 @@ const mapOuter = document.querySelector('.map-outer');
 const ZOOM_SCALE = 1.6;
 
 function zoomToZone(zone) {
-  const mapH = 444;
+  const mapH = 355;
   const MARGIN = 14;
 
   if (!zone) {
@@ -750,7 +750,7 @@ function zoomToZone(zone) {
   }
 
   const S          = ZOOM_SCALE;
-  const MAP_W      = 984;
+  const MAP_W      = 787;
   const cx         = MAP_W * parseFloat(zone.pos.left) / 100;
   const cy         = mapH  * parseFloat(zone.pos.top)  / 100;
   const outerW     = mapOuter.clientWidth;
