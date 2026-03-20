@@ -933,7 +933,29 @@ def main():
         ])
 
     async def error_handler(update, context):
+        import traceback
         logger.error("Ошибка: %s", context.error, exc_info=context.error)
+
+        tb = ''.join(traceback.format_exception(
+            type(context.error), context.error, context.error.__traceback__
+        ))
+
+        user_info = ''
+        if update and update.effective_user:
+            u = update.effective_user
+            user_info = f"👤 {u.full_name} (@{u.username}, id={u.id})\n"
+
+        msg = (
+            f"🚨 <b>Ошибка в боте</b>\n\n"
+            f"{user_info}"
+            f"<pre>{tb[:3500]}</pre>"
+        )
+
+        for admin_id in ([524018174] + list(config.ADMIN_IDS)):
+            try:
+                await context.bot.send_message(admin_id, msg, parse_mode='HTML')
+            except Exception:
+                pass
 
     app = Application.builder().token(config.BOT_TOKEN).post_init(post_init).build()
     app.add_error_handler(error_handler)
