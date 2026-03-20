@@ -118,7 +118,7 @@ def _map_kb() -> InlineKeyboardMarkup:
 def _phone_request_keyboard(is_retry: bool = False) -> ReplyKeyboardMarkup:
     skip_text = "Нет, не хочу" if is_retry else "Пропустить →"
     return ReplyKeyboardMarkup(
-        [[KeyboardButton("📱 Поделиться номером", request_contact=True)],
+        [[KeyboardButton("👇 Поделиться номером телефона", request_contact=True)],
          [KeyboardButton(skip_text)]],
         resize_keyboard=True,
         one_time_keyboard=True,
