@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<title>Калибровка точек</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #eee; font-family: monospace; }
+  h2 { padding: 10px; font-size: 14px; color: #aaa; }
+  #wrap {
+    position: relative;
+    display: inline-block;
+    cursor: crosshair;
+  }
+  #wrap img { display: block; width: 100%; max-width: 1024px; }
+  .mark {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(255,80,80,.7);
+    border: 2px solid #fff;
+    transform: translate(-50%,-50%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: bold; color: #fff;
+    pointer-events: none;
+  }
+  #log {
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.8;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #000;
+    white-space: pre;
+  }
+  #output {
+    padding: 10px;
+    font-size: 11px;
+    background: #0a0a0a;
+    color: #4f4;
+    white-space: pre;
+    line-height: 1.6;
+  }
+  #controls { padding: 10px; display: flex; gap: 10px; }
+  button { padding: 6px 14px; background: #333; color: #eee; border: 1px solid #555; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  button:hover { background: #444; }
+  #zone-input { padding: 6px; background: #222; color: #eee; border: 1px solid #555; border-radius: 4px; width: 60px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h2>Калибровка: введи номер зоны → кликни на точку на карте</h2>
+<div id="controls">
+  <label>Зона: <input id="zone-input" type="number" min="1" max="23" value="1"/></label>
+  <button onclick="undo()">← Отменить последнюю</button>
+  <button onclick="copyOutput()">Скопировать JS</button>
+  <button onclick="clearAll()">Очистить всё</button>
+</div>
+<div id="wrap">
+  <img id="mapimg" src="map.jpg" draggable="false"/>
+</div>
+<div id="log">Клики появятся здесь...</div>
+<div id="output"></div>
+
+<script>
+const clicks = {};
+const wrap = document.getElementById('wrap');
+const img  = document.getElementById('mapimg');
+const log  = document.getElementById('log');
+const out  = document.getElementById('output');
+const zinp = document.getElementById('zone-input');
+
+wrap.addEventListener('click', e => {
+  const rect = img.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const lp = (x / rect.width * 100).toFixed(1) + '%';
+  const tp = (y / rect.height * 100).toFixed(1) + '%';
+  const zid = parseInt(zinp.value);
+
+  clicks[zid] = { left: lp, top: tp };
+
+  // draw mark
+  document.querySelectorAll('.mark[data-id="'+zid+'"]').forEach(m => m.remove());
+  const m = document.createElement('div');
+  m.className = 'mark';
+  m.dataset.id = zid;
+  m.style.left = lp;
+  m.style.top  = tp;
+  m.textContent = zid;
+  wrap.appendChild(m);
+
+  log.textContent = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
+    .map(([id,p]) => `Зона ${id.toString().padStart(2)}: left:${p.left.padStart(6)}, top:${p.top.padStart(6)}`).join('\n');
+  
+  updateOutput();
+  zinp.value = zid + 1;
+  zinp.focus();
+});
+
+function updateOutput() {
+  const lines = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
+    .map(([id,p]) => `  { id:${id} … pos:{left:'${p.left}', top:'${p.top}'} }`);
+  out.textContent = 'Позиции зон:\n' + lines.join('\n');
+}
+
+function undo() {
+  const ids = Object.keys(clicks).map(Number).sort((a,b)=>a-b);
+  if (!ids.length) return;
+  const last = ids[ids.length - 1];
+  delete clicks[last];
+  document.querySelectorAll('.mark[data-id="'+last+'"]').forEach(m => m.remove());
+  zinp.value = last;
+  log.textContent = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
+    .map(([id,p]) => `Зона ${id.toString().padStart(2)}: left:${p.left.padStart(6)}, top:${p.top.padStart(6)}`).join('\n') || 'Клики появятся здесь...';
+  updateOutput();
+}
+
+function clearAll() {
+  Object.keys(clicks).forEach(k => delete clicks[k]);
+  document.querySelectorAll('.mark').forEach(m => m.remove());
+  log.textContent = 'Клики появятся здесь...';
+  out.textContent = '';
+  zinp.value = 1;
+}
+
+function copyOutput() {
+  const text = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
+    .map(([id,p]) => `  ${id}: {left:'${p.left}', top:'${p.top}'}`).join(',\n');
+  navigator.clipboard.writeText(text).then(() => alert('Скопировано!'));
+}
+</script>
+</body>
+</html>
