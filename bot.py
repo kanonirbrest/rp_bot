@@ -32,10 +32,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Bottom keyboard ────────────────────────────────────────────────
-MENU_MAIN    = "🏠 Главное меню"
-MENU_OFFERS  = "💝 Специальные предложения"
-MENU_CONTACT = "📞 Связаться с нами"
-MENU_REVIEW  = "⭐ Оставить отзыв"
+MENU_MAIN    = "Главное меню"
+MENU_OFFERS  = "Специальные предложения"
+MENU_CONTACT = "Связаться с нами"
+MENU_REVIEW  = "Оставить отзыв"
 
 # ── Review conversation states ─────────────────────────────────────
 SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
@@ -75,15 +75,14 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
 
 def main_menu_inline() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🎨 Выставка "Небо.Река"',       callback_data="cb_exhibition")],
-        [InlineKeyboardButton("🗺 Карта выставки",              web_app=WebAppInfo(url=MAP_BASE_URL))],
-        [InlineKeyboardButton("💝 Специальные предложения",     callback_data="cb_offers")],
-        [InlineKeyboardButton("📅 Ближайшие анонсы",            callback_data="cb_announcements")],
-        [InlineKeyboardButton("🎁 Подарочные сертификаты",      callback_data="cb_certificates")],
-        [InlineKeyboardButton("❓ Часто задаваемые вопросы",    callback_data="cb_faq")],
-        [InlineKeyboardButton("📞 Связаться с нами",            callback_data="cb_contact")],
-        [InlineKeyboardButton("⭐ Оставить отзыв",              callback_data="review_start")],
-        [InlineKeyboardButton("ℹ️ О RAZMAN production",         callback_data="cb_about")],
+        [InlineKeyboardButton('Выставка "Небо.Река" 🎨',        callback_data="cb_exhibition")],
+        [InlineKeyboardButton("Карта выставки 🗺",               web_app=WebAppInfo(url=MAP_BASE_URL))],
+        [InlineKeyboardButton("Специальные предложения 💝",      callback_data="cb_offers")],
+        [InlineKeyboardButton("Подарочные сертификаты 🎁",       callback_data="cb_certificates")],
+        [InlineKeyboardButton("Часто задаваемые вопросы ❓",     callback_data="cb_faq")],
+        [InlineKeyboardButton("Связаться с нами 📞",             callback_data="cb_contact")],
+        [InlineKeyboardButton("Оставить отзыв ⭐",               callback_data="review_start")],
+        [InlineKeyboardButton("О RAZMAN production ℹ️",          callback_data="cb_about")],
     ])
 
 
