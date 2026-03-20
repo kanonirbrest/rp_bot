@@ -749,15 +749,19 @@ function zoomToZone(zone) {
     return;
   }
 
-  const S        = ZOOM_SCALE;
-  const cx       = 984 * parseFloat(zone.pos.left) / 100;
-  const cy       = mapH * parseFloat(zone.pos.top)  / 100;
-  const outerW   = mapOuter.clientWidth;
+  const S          = ZOOM_SCALE;
+  const MAP_W      = 984;
+  const cx         = MAP_W * parseFloat(zone.pos.left) / 100;
+  const cy         = mapH  * parseFloat(zone.pos.top)  / 100;
+  const outerW     = mapOuter.clientWidth;
   const scrollLeft = mapOuter.scrollLeft;
 
-  // factor in current scroll so there's no instant jump
-  const tx = outerW / 2 - MARGIN - cx * S + scrollLeft;
-  const ty = mapH / 2 - cy * S;
+  const rawTx = outerW / 2 - MARGIN - cx * S + scrollLeft;
+  const rawTy = mapH   / 2 - cy * S;
+
+  // clamp so map edges never go beyond the viewport
+  const tx = Math.min(-MARGIN, Math.max(outerW - MARGIN - MAP_W * S, rawTx));
+  const ty = Math.min(0,       Math.max(mapH   * (1 - S),            rawTy));
 
   mapOuter.style.overflowX = 'hidden';
   mapInner.style.transform = `translate(${tx}px, ${ty}px) scale(${S})`;
