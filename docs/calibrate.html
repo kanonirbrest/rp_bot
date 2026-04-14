@@ -8,16 +8,28 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #111; color: #eee; font-family: monospace; }
   h2 { padding: 10px; font-size: 14px; color: #aaa; }
-  .hint { padding: 0 10px 10px; font-size: 12px; color: #666; max-width: 1024px; line-height: 1.5; }
+  .hint { padding: 0 10px 10px; font-size: 12px; color: #666; max-width: 820px; line-height: 1.5; }
+  /* Как карта в index.html: ширина 787px, высота по пропорции map.jpg, без object-fit */
   #wrap {
     position: relative;
+    width: 787px;
     display: inline-block;
     cursor: crosshair;
+    border-radius: 10px;
+    overflow: hidden;
+    line-height: 0;
+    background: #0a1214;
   }
-  /* 787px как у .map-inner на странице карты — проценты совпадают с WebApp */
-  #wrap img { display: block; width: 100%; max-width: 787px; }
+  #mapimg {
+    width: 100%;
+    height: auto;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+  }
   .mark {
     position: absolute;
+    z-index: 3;
     width: 22px; height: 22px;
     border-radius: 50%;
     background: rgba(255,80,80,.85);
@@ -58,9 +70,8 @@
   Замени <code>map.jpg</code> на новую схему — перезагрузи страницу и проставь точки заново.
   Запуск локально: в каталоге <code>docs</code> выполни <code>python3 -m http.server 8765</code> и открой
   <code>http://localhost:8765/calibrate.html</code> (через <code>file://</code> картинка тоже обычно открывается).
-  Кликай по <strong>центру напечатанного на плане круга</strong> — интерактивные круги в WebApp накладываются на них.
-  Скопированные проценты вставь в <code>patch_index_zones.py</code> или в <code>ZONES</code> в <code>docs/index.html</code>.
-  Превью здесь 787px по ширине, как блок карты на сайте — так проценты совпадают с продом.
+  Кликай по <strong>центру напечатанного круга</strong>. Ширина <strong>787px</strong>, высота — как у файла <code>map.jpg</code> (без обрезки <code>cover</code>), как на странице карты.
+  После смены вёрстки координаты нужно **переснять заново**. Скопированные проценты → <code>patch_index_zones.py</code>, затем <code>python3 docs/patch_index_zones.py</code>.
 </p>
 <div id="controls">
   <label>Зона: <input id="zone-input" type="number" min="1" max="21" value="1"/></label>

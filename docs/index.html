@@ -123,20 +123,21 @@
     .map-inner {
       position: relative;
       width: 787px;
-      height: 355px;
       margin: 0 14px;
       transform-origin: 0 0;
       transition: transform 1.3s cubic-bezier(.4,0,.2,1);
       border-radius: 10px;
       overflow: hidden;
     }
-    .floor-img {
-      position: absolute;
-      inset: 0;
+    /* Слой под картинку + точки: высота = натуральная по ширине 787px, без object-fit/crop */
+    .map-stage {
+      position: relative;
       width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
+      line-height: 0;
+    }
+    .floor-img {
+      width: 100%;
+      height: auto;
       display: block;
     }
     .dots-layer { z-index: 2; }
@@ -291,12 +292,10 @@
 
 <div class="map-outer">
   <div class="map-inner">
-
-    <!-- ── Floor plan photo ── -->
-    <img class="floor-img" src="map.jpg" alt="План выставки" draggable="false"/>
-
-    <!-- Zone dots (injected by JS) -->
-    <div class="dots-layer" id="dots"></div>
+    <div class="map-stage">
+      <img class="floor-img" src="map.jpg" alt="План выставки" draggable="false"/>
+      <div class="dots-layer" id="dots"></div>
+    </div>
   </div>
 </div>
 
@@ -774,6 +773,7 @@ const dotsEl    = document.getElementById('dots');
 const zlistEl   = document.getElementById('zlist');
 const secTitle  = document.getElementById('sec-title');
 const mapInner  = document.querySelector('.map-inner');
+const mapStage  = () => mapInner.querySelector('.map-stage');
 const mapOuter  = document.querySelector('.map-outer');
 
 function applyFloor(floor) {
@@ -816,8 +816,10 @@ document.querySelectorAll('.fsw').forEach(btn => {
 const ZOOM_SCALE = 1.15;
 
 function zoomToZone(zone) {
-  const mapH = 355;
   const MARGIN = 14;
+  const stage = mapStage();
+  const MAP_W   = stage ? stage.offsetWidth  : 787;
+  const mapH    = stage ? stage.offsetHeight : 355;
 
   if (!zone) {
     mapInner.style.transform = '';
@@ -826,7 +828,6 @@ function zoomToZone(zone) {
   }
 
   const S          = ZOOM_SCALE;
-  const MAP_W      = 787;
   const cx         = MAP_W * parseFloat(zone.pos.left) / 100;
   const cy         = mapH  * parseFloat(zone.pos.top)  / 100;
   const outerW     = mapOuter.clientWidth;
