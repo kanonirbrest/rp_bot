@@ -49,9 +49,10 @@ SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 # ── Constants ──────────────────────────────────────────────────────
 TICKET_URL   = "https://www.ticketpro.by/raznoe/neboreka---planeta-posle-shuma/"
 ABOUT_URL    = "https://dei.by/about"
-YANDEX_URL   = "https://yandex.ru/navi/org/37468561319?si=g47c3yvm4mfkntjk53aud05zg8"
+YANDEX_URL   = "https://yandex.ru/navi/org/dom_eksperimentalnogo_iskusstva/194412181469?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
 TG_USERNAME  = "DEI_by_RP"
+# Интерактивная карта (картинка, клики, полные тексты зон) — в репозитории GitHub Pages по этому URL.
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 
 PROJECTS = [
@@ -64,10 +65,27 @@ PROJECTS = [
 ]
 
 ZONE_NAMES = {
-    1: "Луч с управлением",
-    2: "Письмо вспышка",
-    3: "Сколько лаванды ты весишь",
-    4: "Хождение по воде",
+    1: "Карта состояний",
+    2: "Соединение",
+    3: "Свет в руках",
+    4: "Оранжерея",
+    5: "Почерк на песке",
+    6: "Палитра песков",
+    7: "Мост признаний",
+    8: "Созвездие Небо.Реки",
+    9: "Окно спокойствия",
+    10: "Аллея бабочек",
+    11: "Послание Небо.Реки",
+    12: "Смотровая площадка",
+    13: "Кофейня и сувениры",
+    14: "Полёт над облаками",
+    15: "Путешествие по реке",
+    16: "Касание стихии (с мая)",
+    17: "Водопад",
+    18: "Сколько в тебе цветов",
+    19: "Письмо себе в будущее",
+    20: "Библиотека тишины",
+    21: "Небо покоя",
 }
 
 # ── Keyboards ──────────────────────────────────────────────────────
@@ -900,7 +918,7 @@ async def cmd_qrzone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         zone_id = int(context.args[0])
         if zone_id not in ZONE_NAMES:
-            await update.message.reply_text("Номер локации: 1, 2, 3 или 4")
+            await update.message.reply_text("Номер локации: от 1 до 21")
             return
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}/map?startapp={zone_id}"

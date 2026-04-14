@@ -2,11 +2,13 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8"/>
-<title>Калибровка точек</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Калибровка точек — карта Небо.Реки</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #111; color: #eee; font-family: monospace; }
   h2 { padding: 10px; font-size: 14px; color: #aaa; }
+  .hint { padding: 0 10px 10px; font-size: 12px; color: #666; max-width: 1024px; line-height: 1.5; }
   #wrap {
     position: relative;
     display: inline-block;
@@ -15,9 +17,9 @@
   #wrap img { display: block; width: 100%; max-width: 1024px; }
   .mark {
     position: absolute;
-    width: 20px; height: 20px;
+    width: 22px; height: 22px;
     border-radius: 50%;
-    background: rgba(255,80,80,.7);
+    background: rgba(255,80,80,.85);
     border: 2px solid #fff;
     transform: translate(-50%,-50%);
     display: flex; align-items: center; justify-content: center;
@@ -40,28 +42,37 @@
     color: #4f4;
     white-space: pre;
     line-height: 1.6;
+    overflow-x: auto;
   }
-  #controls { padding: 10px; display: flex; gap: 10px; }
+  #controls { padding: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   button { padding: 6px 14px; background: #333; color: #eee; border: 1px solid #555; cursor: pointer; border-radius: 4px; font-size: 12px; }
   button:hover { background: #444; }
   #zone-input { padding: 6px; background: #222; color: #eee; border: 1px solid #555; border-radius: 4px; width: 60px; font-size: 12px; }
 </style>
 </head>
 <body>
-<h2>Калибровка: введи номер зоны → кликни на точку на карте</h2>
+<h2>Калибровка: номер зоны (1–21) → клик по центру круга на карте</h2>
+<p class="hint">
+  Картинка берётся из файла <strong>map.jpg</strong> в этой же папке (<code>docs/</code>).
+  Замени <code>map.jpg</code> на новую схему — перезагрузи страницу и проставь точки заново.
+  Запуск локально: в каталоге <code>docs</code> выполни <code>python3 -m http.server 8765</code> и открой
+  <code>http://localhost:8765/calibrate.html</code> (через <code>file://</code> картинка тоже обычно открывается).
+  Скопированные проценты вставь в <code>pos: { left, top }</code> массива <code>ZONES</code> в <code>rp_bot/docs/index.html</code>.
+</p>
 <div id="controls">
-  <label>Зона: <input id="zone-input" type="number" min="1" max="23" value="1"/></label>
-  <button onclick="undo()">← Отменить последнюю</button>
-  <button onclick="copyOutput()">Скопировать JS</button>
-  <button onclick="clearAll()">Очистить всё</button>
+  <label>Зона: <input id="zone-input" type="number" min="1" max="21" value="1"/></label>
+  <button type="button" onclick="undo()">← Отменить последнюю</button>
+  <button type="button" onclick="copyOutput()">Скопировать координаты</button>
+  <button type="button" onclick="clearAll()">Очистить всё</button>
 </div>
 <div id="wrap">
-  <img id="mapimg" src="map.jpg" draggable="false"/>
+  <img id="mapimg" src="map.jpg" alt="Карта" draggable="false"/>
 </div>
 <div id="log">Клики появятся здесь...</div>
 <div id="output"></div>
 
 <script>
+const ZONE_MAX = 21;
 const clicks = {};
 const wrap = document.getElementById('wrap');
 const img  = document.getElementById('mapimg');
@@ -69,49 +80,57 @@ const log  = document.getElementById('log');
 const out  = document.getElementById('output');
 const zinp = document.getElementById('zone-input');
 
+function syncLog() {
+  const entries = Object.entries(clicks).sort((a,b) => Number(a[0]) - Number(b[0]));
+  log.textContent = entries.length
+    ? entries.map(([id, p]) => `Зона ${id.toString().padStart(2)}: left:${p.left.padStart(6)}, top:${p.top.padStart(6)}`).join('\n')
+    : 'Клики появятся здесь...';
+}
+
+function updateOutput() {
+  const lines = Object.entries(clicks).sort((a,b) => Number(a[0]) - Number(b[0]))
+    .map(([id, p]) => `  { id:${id}, … pos:{left:'${p.left}', top:'${p.top}'} }`);
+  out.textContent = lines.length ? ('Позиции зон:\n' + lines.join('\n')) : '';
+}
+
 wrap.addEventListener('click', e => {
+  const zid = parseInt(zinp.value, 10);
+  if (Number.isNaN(zid) || zid < 1 || zid > ZONE_MAX) {
+    alert('Введи номер зоны от 1 до ' + ZONE_MAX);
+    return;
+  }
+
   const rect = img.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const lp = (x / rect.width * 100).toFixed(1) + '%';
   const tp = (y / rect.height * 100).toFixed(1) + '%';
-  const zid = parseInt(zinp.value);
 
   clicks[zid] = { left: lp, top: tp };
 
-  // draw mark
-  document.querySelectorAll('.mark[data-id="'+zid+'"]').forEach(m => m.remove());
+  document.querySelectorAll('.mark[data-id="' + zid + '"]').forEach(m => m.remove());
   const m = document.createElement('div');
   m.className = 'mark';
-  m.dataset.id = zid;
+  m.dataset.id = String(zid);
   m.style.left = lp;
   m.style.top  = tp;
   m.textContent = zid;
   wrap.appendChild(m);
 
-  log.textContent = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
-    .map(([id,p]) => `Зона ${id.toString().padStart(2)}: left:${p.left.padStart(6)}, top:${p.top.padStart(6)}`).join('\n');
-  
+  syncLog();
   updateOutput();
-  zinp.value = zid + 1;
+  zinp.value = String(Math.min(zid + 1, ZONE_MAX));
   zinp.focus();
 });
 
-function updateOutput() {
-  const lines = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
-    .map(([id,p]) => `  { id:${id} … pos:{left:'${p.left}', top:'${p.top}'} }`);
-  out.textContent = 'Позиции зон:\n' + lines.join('\n');
-}
-
 function undo() {
-  const ids = Object.keys(clicks).map(Number).sort((a,b)=>a-b);
+  const ids = Object.keys(clicks).map(Number).sort((a, b) => a - b);
   if (!ids.length) return;
   const last = ids[ids.length - 1];
   delete clicks[last];
-  document.querySelectorAll('.mark[data-id="'+last+'"]').forEach(m => m.remove());
-  zinp.value = last;
-  log.textContent = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
-    .map(([id,p]) => `Зона ${id.toString().padStart(2)}: left:${p.left.padStart(6)}, top:${p.top.padStart(6)}`).join('\n') || 'Клики появятся здесь...';
+  document.querySelectorAll('.mark[data-id="' + last + '"]').forEach(m => m.remove());
+  zinp.value = String(last);
+  syncLog();
   updateOutput();
 }
 
@@ -120,13 +139,23 @@ function clearAll() {
   document.querySelectorAll('.mark').forEach(m => m.remove());
   log.textContent = 'Клики появятся здесь...';
   out.textContent = '';
-  zinp.value = 1;
+  zinp.value = '1';
 }
 
 function copyOutput() {
-  const text = Object.entries(clicks).sort((a,b)=>a[0]-b[0])
-    .map(([id,p]) => `  ${id}: {left:'${p.left}', top:'${p.top}'}`).join(',\n');
-  navigator.clipboard.writeText(text).then(() => alert('Скопировано!'));
+  const text = Object.entries(clicks).sort((a,b) => Number(a[0]) - Number(b[0]))
+    .map(([id, p]) => '  ' + id + ": {left:'" + p.left + "', top:'" + p.top + "'}").join(',\n');
+  if (!text) {
+    alert('Нет точек для копирования');
+    return;
+  }
+  navigator.clipboard.writeText(text).then(
+    () => alert('Скопировано в буфер'),
+    () => {
+      out.textContent = (out.textContent ? out.textContent + '\n\n' : '') + text;
+      alert('Буфер недоступен — координаты добавлены внизу страницы, скопируй вручную');
+    }
+  );
 }
 </script>
 </body>
