@@ -14,7 +14,8 @@
     display: inline-block;
     cursor: crosshair;
   }
-  #wrap img { display: block; width: 100%; max-width: 1024px; }
+  /* 787px как у .map-inner на странице карты — проценты совпадают с WebApp */
+  #wrap img { display: block; width: 100%; max-width: 787px; }
   .mark {
     position: absolute;
     width: 22px; height: 22px;
@@ -57,7 +58,9 @@
   Замени <code>map.jpg</code> на новую схему — перезагрузи страницу и проставь точки заново.
   Запуск локально: в каталоге <code>docs</code> выполни <code>python3 -m http.server 8765</code> и открой
   <code>http://localhost:8765/calibrate.html</code> (через <code>file://</code> картинка тоже обычно открывается).
-  Скопированные проценты вставь в <code>pos: { left, top }</code> массива <code>ZONES</code> в <code>rp_bot/docs/index.html</code>.
+  Кликай по <strong>центру напечатанного на плане круга</strong> — интерактивные круги в WebApp накладываются на них.
+  Скопированные проценты вставь в <code>patch_index_zones.py</code> или в <code>ZONES</code> в <code>docs/index.html</code>.
+  Превью здесь 787px по ширине, как блок карты на сайте — так проценты совпадают с продом.
 </p>
 <div id="controls">
   <label>Зона: <input id="zone-input" type="number" min="1" max="21" value="1"/></label>
