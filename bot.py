@@ -1084,29 +1084,52 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-    if not context.args or not context.args[0].isdigit():
+    if not context.args:
         await update.message.reply_text(
-            "Использование: /revokepromo <telegram_user_id>\n\n"
-            "Отключает индивидуальный промокод подарочного сертификата для этого пользователя."
+            "Использование: /revokepromo NR-XXXXXXXX\n\n"
+            "Отключает промокод только по коду (как у пользователя в сообщении)."
         )
         return
-    uid = int(context.args[0])
+    raw = context.args[0].strip()
+    uid = await db.get_user_id_by_promo_code(raw)
+    if uid is None:
+        await update.message.reply_text(
+            "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
+        )
+        return
     ok = await db.deactivate_user_promo(uid)
+    code_disp = html.escape(raw.strip().upper())
     if ok:
-        await update.message.reply_text(f"✅ Промокод пользователя {uid} отключён.")
+        await update.message.reply_text(
+            f"✅ Промокод <code>{code_disp}</code> отключён.",
+            parse_mode="HTML",
+        )
     else:
         await update.message.reply_text(
-            f"У пользователя {uid} нет промокода (возможно, он ещё не нажимал «Сгенерировать»)."
+            "Не удалось отключить промокод. Попробуйте ещё раз."
         )
 
 
 async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-    if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("Использование: /userpromo <telegram_user_id>")
+    if not context.args:
+        await update.message.reply_text(
+            "Использование:\n"
+            "/userpromo <telegram_user_id>\n"
+            "/userpromo <код> — например NR-XXXXXXXX"
+        )
         return
-    uid = int(context.args[0])
+    raw = context.args[0].strip()
+    if raw.isdigit():
+        uid = int(raw)
+    else:
+        uid = await db.get_user_id_by_promo_code(raw)
+        if uid is None:
+            await update.message.reply_text(
+                "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
+            )
+            return
     row = await db.get_user_promo(uid)
     if not row:
         await update.message.reply_text(f"У пользователя {uid} промокод ещё не создавался.")

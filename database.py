@@ -113,6 +113,21 @@ async def _new_unique_promo_code() -> str:
     raise RuntimeError("не удалось сгенерировать уникальный промокод")
 
 
+async def get_user_id_by_promo_code(code: str) -> int | None:
+    """Находит пользователя по строке кода (без учёта регистра)."""
+    normalized = code.strip().upper()
+    if not normalized:
+        return None
+    result = await _execute(
+        "SELECT user_id FROM user_promos WHERE code = ?",
+        [normalized],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    return int(rows[0]["user_id"])
+
+
 async def get_user_promo(user_id: int) -> dict | None:
     result = await _execute(
         "SELECT user_id, code, active, created_at FROM user_promos WHERE user_id = ?",
