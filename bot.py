@@ -5,7 +5,6 @@ import logging
 import os
 import re
 from datetime import date, datetime
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 from telegram import (
@@ -133,8 +132,8 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def certificates_kb():
-    """Кнопка промокода только пока акция не закончилась по дате."""
+def gift_promo_kb():
+    """Кнопка промокода в разделе спецпредложений (пока акция по дате активна)."""
     if not is_gift_promo_campaign_active():
         return None
     return InlineKeyboardMarkup([
@@ -221,7 +220,8 @@ async def _check_phone_gate(
     context.user_data["phone_stage"] = phone_stage
     if phone_stage.startswith("gift_promo"):
         intro = (
-            "🎁 Индивидуальный промокод доступен участникам клуба с подтверждённым номером.\n\n"
+            "🎁 Персональный промокод в разделе «Специальные предложения» доступен участникам клуба "
+            "с подтверждённым номером.\n\n"
             "Поделись номером телефона, чтобы продолжить:"
         )
     else:
@@ -236,8 +236,8 @@ async def _check_phone_gate(
     return False
 
 
-async def _send_offers_text(update: Update):
-    await update.effective_message.reply_text(
+def _offers_discounts_text() -> str:
+    return (
         "🎁 Действующие акции:\n\n"
         "1. Скидка 20% на билеты студентам и школьникам от 12 лет в будние дни "
         "(при предъявлении подтверждающего документа)\n\n"
@@ -246,7 +246,41 @@ async def _send_offers_text(update: Update):
         "3. При покупке 5 и более билетов — 1 полёт на качелях включён в стоимость\n\n"
         "4. Скидка 5% на билеты в одном чеке имениннику в день его рождения, "
         "а также 3 дня после (при предъявлении паспорта)\n\n"
-        "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит.",
+        "Акции не суммируются, вы выбираете ту акцию, которая вам наиболее подходит."
+    )
+
+
+async def _send_offers_text(update: Update):
+    """Текст акций клуба + блок персонального промокода (раздел «Специальные предложения»)."""
+    uid = update.effective_user.id
+    base = _offers_discounts_text()
+    kb = None
+    out_text = base
+    parse_mode = None
+
+    if is_gift_promo_campaign_active():
+        try:
+            row = await db.get_user_promo(uid)
+        except Exception as e:
+            logger.error("get_user_promo in _send_offers_text: %s", e)
+            row = None
+        if row and row["active"]:
+            out_text = html.escape(base) + "\n\n" + format_user_promo_message(row["code"])
+            parse_mode = "HTML"
+        elif row and not row["active"]:
+            out_text = (
+                html.escape(base)
+                + "\n\n"
+                + html.escape(gift_promo_revoked_by_admin_user_message())
+            )
+            parse_mode = "HTML"
+        else:
+            kb = gift_promo_kb()
+
+    await update.effective_message.reply_text(
+        out_text,
+        reply_markup=kb,
+        parse_mode=parse_mode,
     )
 
 
@@ -457,8 +491,8 @@ async def _send_announcements(message):
         logger.error("_send_announcements reply failed: %s", e)
 
 
-def _certificates_intro_text() -> str:
-    return (
+async def _send_certificates(message):
+    text = (
         "Подарочные сертификаты 🎁\n\n"
         "Самый лучший подарок — это впечатления! А если точная дата пока неизвестна, "
         "мы сохраним её в секрете до нужного момента.\n\n"
@@ -466,53 +500,14 @@ def _certificates_intro_text() -> str:
         "которые мы упакуем в красивый подарочный конверт, "
         "чтобы момент дарения уже стал особенным ❤️"
     )
-
-
-async def _send_certificates(message, user_id: Optional[int] = None):
-    """Показывает раздел сертификатов; активный промокод — сразу в сообщении; отозванный — без кнопки повторной выдачи."""
-    uid = user_id
-    if uid is None and message.from_user:
-        uid = message.from_user.id
-
-    intro = _certificates_intro_text()
-    kb = None
-    out_text = intro
-    parse_mode = None
-
-    if uid and is_gift_promo_campaign_active():
-        try:
-            row = await db.get_user_promo(uid)
-        except Exception as e:
-            logger.error("get_user_promo in _send_certificates: %s", e)
-            row = None
-        if row and row["active"]:
-            out_text = html.escape(intro) + "\n\n" + format_user_promo_message(row["code"])
-            parse_mode = "HTML"
-        elif row and not row["active"]:
-            out_text = (
-                html.escape(intro)
-                + "\n\n"
-                + html.escape(gift_promo_revoked_by_admin_user_message())
-            )
-            parse_mode = "HTML"
-        else:
-            kb = certificates_kb()
-    else:
-        kb = certificates_kb()
-
     try:
         photo = await db.get_setting("cert_photo")
     except Exception:
         photo = None
     if photo:
-        await message.reply_photo(
-            photo=photo,
-            caption=out_text,
-            reply_markup=kb,
-            parse_mode=parse_mode,
-        )
+        await message.reply_photo(photo=photo, caption=text)
     else:
-        await message.reply_text(out_text, reply_markup=kb, parse_mode=parse_mode)
+        await message.reply_text(text)
 
 
 async def _send_giveaway(message, user):
@@ -563,7 +558,7 @@ async def cmd_announcements_cmd(update: Update, context: ContextTypes.DEFAULT_TY
     await _send_announcements(update.effective_message)
 
 async def cmd_certificates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _send_certificates(update.effective_message, update.effective_user.id)
+    await _send_certificates(update.effective_message)
 
 async def cmd_faq_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(FAQ_LIST_TEXT, reply_markup=FAQ_KB)
@@ -607,7 +602,7 @@ async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await _send_certificates(query.message, query.from_user.id)
+    await _send_certificates(query.message)
 
 
 async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
