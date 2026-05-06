@@ -137,8 +137,7 @@ def format_user_promo_message(code: str) -> str:
     c = html.escape(code)
     return (
         "Твой персональный промокод на скидку 10% на иммерсивную медиа-выставку "
-        "«Небо.Река» — "
-        f"<code>{c}</code>\n\n"
+        f"«Небо.Река» — <code>{c}</code>\n\n"
         "Как использовать: назови свой промокод на кассе при покупке билетов 👌🏻\n\n"
         f"*промокод действует по {GIFT_PROMO_VALID_UNTIL}\n\n"
         "Встретимся в DEI 🤍"
@@ -209,7 +208,7 @@ async def _check_phone_gate(
     context.user_data["phone_stage"] = phone_stage
     if phone_stage.startswith("gift_promo"):
         intro = (
-            "🎁 Персональный промокод в разделе «Специальные предложения» доступен участникам клуба "
+            "🎁 Персональная скидка в разделе «Специальные предложения» доступна участникам клуба "
             "с подтверждённым номером.\n\n"
             "Поделись номером телефона, чтобы продолжить:"
         )
@@ -239,16 +238,29 @@ def _offers_discounts_text() -> str:
     )
 
 
-def _offers_nav_keyboard(active: str, *, include_generate: bool = False) -> InlineKeyboardMarkup:
-    """Две вкладки раздела спецпредложений. active: 'general' | 'promo'."""
+def _offers_hub_text() -> str:
+    return (
+        "Здесь вас ждут эксклюзивные акции и выгодные предложения, которые сделают "
+        "ваше посещение еще приятнее"
+    )
+
+
+def _offers_nav_keyboard(
+    active: str | None,
+    *,
+    include_generate: bool = False,
+) -> InlineKeyboardMarkup:
+    """Вкладки спецпредложений в столбик (читаемо на узком экране). active: None | 'general' | 'promo'."""
     rows = [
         [
             InlineKeyboardButton(
                 "📋 Постоянные акции" + (" ✓" if active == "general" else ""),
                 callback_data="cb_offers_general",
             ),
+        ],
+        [
             InlineKeyboardButton(
-                "🎟 Персональный промокод" + (" ✓" if active == "promo" else ""),
+                "🎟 Персональная скидка" + (" ✓" if active == "promo" else ""),
                 callback_data="cb_offers_promo",
             ),
         ],
@@ -266,24 +278,15 @@ def _offers_nav_keyboard(active: str, *, include_generate: bool = False) -> Inli
 async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, InlineKeyboardMarkup]:
     """
     Собирает текст и клавиатуру вкладки спецпредложений.
-    tab: 'auto' — если акция промокода активна и у пользователя есть код, открываем вкладку промокода,
-         иначе постоянные акции; 'general' | 'promo' — явный выбор.
+    tab: 'auto' — общий экран-приветствие и две кнопки; 'general' | 'promo' — явный выбор.
     """
     if tab == "auto":
-        tab = "general"
-        if is_gift_promo_campaign_active():
-            try:
-                row = await db.get_user_promo(user_id)
-            except Exception as e:
-                logger.error("get_user_promo in _build_offers_tab auto: %s", e)
-                row = None
-            if row and row["active"]:
-                tab = "promo"
+        return _offers_hub_text(), None, _offers_nav_keyboard(None)
 
     if tab == "general":
         return _offers_discounts_text(), None, _offers_nav_keyboard("general")
 
-    # вкладка «Персональный промокод»
+    # вкладка «Персональная скидка»
     if not is_gift_promo_campaign_active():
         return (
             gift_promo_campaign_expired_user_message(),
@@ -313,9 +316,9 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
 
     return (
         (
-            "🎟 Персональный промокод\n\n"
+            "🎟 Персональная скидка\n\n"
             "Скидка 10% на иммерсивную медиа-выставку «Небо.Река». "
-            "Нажми кнопку ниже, чтобы получить индивидуальный код "
+            "Нажми кнопку ниже, чтобы получить индивидуальный промокод "
             "(для участников клуба с подтверждённым номером телефона)."
         ),
         None,
@@ -342,7 +345,7 @@ async def _safe_edit_offers_message(
 
 
 async def _send_offers_text(update: Update):
-    """Раздел «Специальные предложения»: вкладки постоянные акции / персональный промокод."""
+    """Раздел «Специальные предложения»: общий текст и вкладки постоянные акции / персональная скидка."""
     uid = update.effective_user.id
     text, parse_mode, kb = await _build_offers_tab(uid, "auto")
     await update.effective_message.reply_text(
