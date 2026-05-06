@@ -1,8 +1,11 @@
 import asyncio
+import html
 import io
 import logging
 import os
 import re
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from telegram import (
     InlineKeyboardButton,
@@ -64,6 +67,30 @@ PROJECTS = [
     "Дом Рождества 1.0",
 ]
 
+# Единый текст выдачи промокода (10%, срок — см. GIFT_PROMO_VALID_UNTIL).
+GIFT_PROMO_VALID_UNTIL = "01.07.2026"
+GIFT_PROMO_TIMEZONE = ZoneInfo("Europe/Minsk")
+
+
+def _gift_promo_last_valid_day() -> date:
+    d, m, y = GIFT_PROMO_VALID_UNTIL.strip().split(".")
+    return date(int(y), int(m), int(d))
+
+
+def is_gift_promo_campaign_active() -> bool:
+    """Промокоды действуют включительно до GIFT_PROMO_VALID_UNTIL (календарный день, Минск)."""
+    today = datetime.now(GIFT_PROMO_TIMEZONE).date()
+    return today <= _gift_promo_last_valid_day()
+
+
+def gift_promo_campaign_expired_user_message() -> str:
+    return (
+        "Срок действия персональных промокодов на выставку «Небо.Река» истёк "
+        f"(акция была до {GIFT_PROMO_VALID_UNTIL}).\n\n"
+        "Билеты и подарочные сертификаты по-прежнему можно приобрести в кассе DEI 🤍"
+    )
+
+
 ZONE_NAMES = {
     1: "Карта состояний",
     2: "Соединение",
@@ -94,6 +121,30 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
         [[MENU_MAIN, MENU_OFFERS], [MENU_CONTACT, MENU_REVIEW]],
         is_persistent=True,
         resize_keyboard=True,
+    )
+
+
+def certificates_kb():
+    """Кнопка промокода только пока акция не закончилась по дате."""
+    if not is_gift_promo_campaign_active():
+        return None
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "Сгенерировать индивидуальный промокод",
+            callback_data="cb_gen_gift_promo",
+        )],
+    ])
+
+
+def format_user_promo_message(code: str) -> str:
+    c = html.escape(code)
+    return (
+        "Твой персональный промокод на скидку 10% на иммерсивную медиа-выставку "
+        "«Небо.Река» — "
+        f"<code>{c}</code>\n\n"
+        "Как использовать: назови свой промокод на кассе при покупке билетов 👌🏻\n\n"
+        f"*промокод действует по {GIFT_PROMO_VALID_UNTIL}\n\n"
+        "Встретимся в DEI 🤍"
     )
 
 
@@ -148,15 +199,29 @@ def _phone_request_keyboard(is_retry: bool = False) -> ReplyKeyboardMarkup:
     )
 
 
-async def _check_phone_gate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+async def _check_phone_gate(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    phone_stage: str = "offers_1",
+) -> bool:
     """Проверяет, есть ли номер телефона. Если нет — показывает запрос и возвращает False."""
     phone = await db.get_phone(update.effective_user.id)
     if phone:
         return True
-    context.user_data["phone_stage"] = "offers_1"
+    context.user_data["phone_stage"] = phone_stage
+    if phone_stage.startswith("gift_promo"):
+        intro = (
+            "🎁 Индивидуальный промокод доступен участникам клуба с подтверждённым номером.\n\n"
+            "Поделись номером телефона, чтобы продолжить:"
+        )
+    else:
+        intro = (
+            "💝 Специальные предложения доступны только для участников клуба.\n\n"
+            "Поделись номером телефона, чтобы продолжить:"
+        )
     await update.effective_message.reply_text(
-        "💝 Специальные предложения доступны только для участников клуба.\n\n"
-        "Поделись номером телефона, чтобы продолжить:",
+        intro,
         reply_markup=_phone_request_keyboard(is_retry=False),
     )
     return False
@@ -221,13 +286,33 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await db.save_phone(user.id, contact.phone_number)
     logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
-    context.user_data.pop("phone_stage", None)
+    stage = context.user_data.pop("phone_stage", None)
 
     await update.message.reply_text(
         "Спасибо, запишем тебя в телефонную книгу Razman Production — "
         "теперь мы точно стали друзьями 🙂",
         reply_markup=bottom_keyboard(),
     )
+
+    if stage == "gift_promo_1":
+        if not is_gift_promo_campaign_active():
+            await update.message.reply_text(gift_promo_campaign_expired_user_message())
+            await _send_main_menu_msg(update)
+            return
+        row = await db.issue_user_promo(user.id)
+        if not row["active"]:
+            await update.message.reply_text(
+                "Этот промокод отключён. По вопросам обратитесь в кассу или напишите нам:\n"
+                f"{PHONE}",
+            )
+        else:
+            await update.message.reply_text(
+                format_user_promo_message(row["code"]),
+                parse_mode="HTML",
+            )
+        await _send_main_menu_msg(update)
+        return
+
     await _send_offers_text(update)
     await _send_main_menu_msg(update)
 
@@ -253,6 +338,15 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if stage == "gift_promo_1":
+        context.user_data["phone_stage"] = "gift_promo_2"
+        await update.message.reply_text(
+            "Без номера индивидуальный промокод недоступен.\n\n"
+            "Поделишься контактом?",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
     context.user_data.pop("phone_stage", None)
     await update.message.reply_text(
         "Хорошо, пропустим!", reply_markup=bottom_keyboard()
@@ -268,6 +362,13 @@ async def handle_final_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Раздел специальных предложений доступен только для участников клуба "
             "с подтверждённым номером телефона.",
+            reply_markup=bottom_keyboard(),
+        )
+        return
+
+    if "gift_promo" in stage:
+        await update.message.reply_text(
+            "Индивидуальный промокод доступен только с подтверждённым номером телефона.",
             reply_markup=bottom_keyboard(),
         )
         return
@@ -354,14 +455,15 @@ async def _send_certificates(message):
         "которые мы упакуем в красивый подарочный конверт, "
         "чтобы момент дарения уже стал особенным ❤️"
     )
+    kb = certificates_kb()
     try:
         photo = await db.get_setting("cert_photo")
     except Exception:
         photo = None
     if photo:
-        await message.reply_photo(photo=photo, caption=text)
+        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
     else:
-        await message.reply_text(text)
+        await message.reply_text(text, reply_markup=kb)
 
 
 async def _send_giveaway(message, user):
@@ -457,6 +559,28 @@ async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await _send_certificates(query.message)
+
+
+async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_gift_promo_campaign_active():
+        await query.message.reply_text(gift_promo_campaign_expired_user_message())
+        return
+    if not await _check_phone_gate(update, context, phone_stage="gift_promo_1"):
+        return
+    user = update.effective_user
+    row = await db.issue_user_promo(user.id)
+    if not row["active"]:
+        await query.message.reply_text(
+            "Этот промокод отключён. По вопросам обратитесь в кассу или напишите нам:\n"
+            f"{PHONE}",
+        )
+        return
+    await query.message.reply_text(
+        format_user_promo_message(row["code"]),
+        parse_mode="HTML",
+    )
 
 
 # ── FAQ ────────────────────────────────────────────────────────────
@@ -907,6 +1031,47 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Установи пакет: pip install qrcode[pil]")
 
 
+async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text(
+            "Использование: /revokepromo <telegram_user_id>\n\n"
+            "Отключает индивидуальный промокод подарочного сертификата для этого пользователя."
+        )
+        return
+    uid = int(context.args[0])
+    ok = await db.deactivate_user_promo(uid)
+    if ok:
+        await update.message.reply_text(f"✅ Промокод пользователя {uid} отключён.")
+    else:
+        await update.message.reply_text(
+            f"У пользователя {uid} нет промокода (возможно, он ещё не нажимал «Сгенерировать»)."
+        )
+
+
+async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("Использование: /userpromo <telegram_user_id>")
+        return
+    uid = int(context.args[0])
+    row = await db.get_user_promo(uid)
+    if not row:
+        await update.message.reply_text(f"У пользователя {uid} промокод ещё не создавался.")
+        return
+    st = "активен ✅" if row["active"] else "отключён ⛔️"
+    created = html.escape(row.get("created_at") or "—")
+    await update.message.reply_text(
+        f"Пользователь <code>{uid}</code>\n"
+        f"Код: <code>{html.escape(row['code'])}</code>\n"
+        f"Статус: {st}\n"
+        f"Создан: {created}",
+        parse_mode="HTML",
+    )
+
+
 async def cmd_qrzone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -1042,6 +1207,8 @@ def main():
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
     app.add_handler(CommandHandler("exportreviews", cmd_export_reviews))
+    app.add_handler(CommandHandler("revokepromo", cmd_revokepromo))
+    app.add_handler(CommandHandler("userpromo", cmd_userpromo))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setmainphoto"), cmd_setmainphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setexhibitionphoto"), cmd_setexhibitionphoto))
@@ -1057,6 +1224,7 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_offers,      pattern="^cb_offers$"))
     app.add_handler(CallbackQueryHandler(cb_announcements, pattern="^cb_announcements$"))
     app.add_handler(CallbackQueryHandler(cb_certificates, pattern="^cb_certificates$"))
+    app.add_handler(CallbackQueryHandler(cb_gen_gift_promo, pattern="^cb_gen_gift_promo$"))
     app.add_handler(CallbackQueryHandler(cb_faq,         pattern="^cb_faq$"))
     app.add_handler(CallbackQueryHandler(cb_faq_item,    pattern="^faq_"))
     app.add_handler(CallbackQueryHandler(cb_giveaway,    pattern="^cb_giveaway$"))

@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import io
 import os
+import secrets
+import string
 from datetime import datetime
 
 import httpx
@@ -88,7 +90,70 @@ async def init_db():
             created_at TEXT
         )
     """)
+    await _execute("""
+        CREATE TABLE IF NOT EXISTS user_promos (
+            user_id INTEGER PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        )
+    """)
     await assign_missing_giveaway_numbers()
+
+
+_PROMO_ALPHABET = string.ascii_uppercase + string.digits
+
+
+async def _new_unique_promo_code() -> str:
+    for _ in range(64):
+        code = "NR-" + "".join(secrets.choice(_PROMO_ALPHABET) for _ in range(8))
+        result = await _execute("SELECT 1 FROM user_promos WHERE code = ?", [code])
+        if not _rows(result):
+            return code
+    raise RuntimeError("не удалось сгенерировать уникальный промокод")
+
+
+async def get_user_promo(user_id: int) -> dict | None:
+    result = await _execute(
+        "SELECT user_id, code, active, created_at FROM user_promos WHERE user_id = ?",
+        [user_id],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    row = rows[0]
+    av = row["active"]
+    active = bool(int(av)) if av is not None else True
+    return {
+        "user_id": int(row["user_id"]),
+        "code": row["code"],
+        "active": active,
+        "created_at": row["created_at"],
+    }
+
+
+async def issue_user_promo(user_id: int) -> dict:
+    """Один промокод на пользователя: если уже есть — возвращаем существующий."""
+    existing = await get_user_promo(user_id)
+    if existing:
+        return existing
+    code = await _new_unique_promo_code()
+    now = datetime.now().isoformat(timespec="seconds")
+    await _execute(
+        "INSERT INTO user_promos (user_id, code, active, created_at) VALUES (?, ?, 1, ?)",
+        [user_id, code, now],
+    )
+    row = await get_user_promo(user_id)
+    assert row is not None
+    return row
+
+
+async def deactivate_user_promo(user_id: int) -> bool:
+    """Отключает промокод (после вызова он недействителен для пользователя)."""
+    if await get_user_promo(user_id) is None:
+        return False
+    await _execute("UPDATE user_promos SET active = 0 WHERE user_id = ?", [user_id])
+    return True
 
 
 async def get_setting(key: str) -> str | None:
