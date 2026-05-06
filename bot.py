@@ -414,15 +414,19 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=bottom_keyboard(),
     )
 
+    if stage == "offers_promo_1":
+        uid = user.id
+        text, parse_mode, kb = await _build_offers_tab(uid, "promo")
+        await update.message.reply_text(text, reply_markup=kb, parse_mode=parse_mode)
+        return
+
     if stage == "gift_promo_1":
         if not is_gift_promo_campaign_active():
             await update.message.reply_text(gift_promo_campaign_expired_user_message())
-            await _send_main_menu_msg(update)
             return
         existing = await db.get_user_promo(user.id)
         if existing and not existing["active"]:
             await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
-            await _send_main_menu_msg(update)
             return
         row = await db.issue_user_promo(user.id)
         if not row["active"]:
@@ -432,7 +436,6 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 format_user_promo_message(row["code"]),
                 parse_mode="HTML",
             )
-        await _send_main_menu_msg(update)
         return
 
     await _send_offers_text(update)
