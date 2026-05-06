@@ -15,6 +15,7 @@ from telegram import (
     Update,
     WebAppInfo,
 )
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -132,18 +133,6 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def gift_promo_kb():
-    """Кнопка промокода в разделе спецпредложений (пока акция по дате активна)."""
-    if not is_gift_promo_campaign_active():
-        return None
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "Сгенерировать индивидуальный промокод",
-            callback_data="cb_gen_gift_promo",
-        )],
-    ])
-
-
 def format_user_promo_message(code: str) -> str:
     c = html.escape(code)
     return (
@@ -250,35 +239,114 @@ def _offers_discounts_text() -> str:
     )
 
 
+def _offers_nav_keyboard(active: str, *, include_generate: bool = False) -> InlineKeyboardMarkup:
+    """Две вкладки раздела спецпредложений. active: 'general' | 'promo'."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                "📋 Постоянные акции" + (" ✓" if active == "general" else ""),
+                callback_data="cb_offers_general",
+            ),
+            InlineKeyboardButton(
+                "🎟 Персональный промокод" + (" ✓" if active == "promo" else ""),
+                callback_data="cb_offers_promo",
+            ),
+        ],
+    ]
+    if include_generate:
+        rows.append([
+            InlineKeyboardButton(
+                "Сгенерировать индивидуальный промокод",
+                callback_data="cb_gen_gift_promo",
+            ),
+        ])
+    return InlineKeyboardMarkup(rows)
+
+
+async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, InlineKeyboardMarkup]:
+    """
+    Собирает текст и клавиатуру вкладки спецпредложений.
+    tab: 'auto' — если акция промокода активна и у пользователя есть код, открываем вкладку промокода,
+         иначе постоянные акции; 'general' | 'promo' — явный выбор.
+    """
+    if tab == "auto":
+        tab = "general"
+        if is_gift_promo_campaign_active():
+            try:
+                row = await db.get_user_promo(user_id)
+            except Exception as e:
+                logger.error("get_user_promo in _build_offers_tab auto: %s", e)
+                row = None
+            if row and row["active"]:
+                tab = "promo"
+
+    if tab == "general":
+        return _offers_discounts_text(), None, _offers_nav_keyboard("general")
+
+    # вкладка «Персональный промокод»
+    if not is_gift_promo_campaign_active():
+        return (
+            gift_promo_campaign_expired_user_message(),
+            None,
+            _offers_nav_keyboard("promo"),
+        )
+
+    try:
+        row = await db.get_user_promo(user_id)
+    except Exception as e:
+        logger.error("get_user_promo in _build_offers_tab promo: %s", e)
+        row = None
+
+    if row and row["active"]:
+        return (
+            format_user_promo_message(row["code"]),
+            "HTML",
+            _offers_nav_keyboard("promo"),
+        )
+
+    if row and not row["active"]:
+        return (
+            gift_promo_revoked_by_admin_user_message(),
+            None,
+            _offers_nav_keyboard("promo"),
+        )
+
+    return (
+        (
+            "🎟 Персональный промокод\n\n"
+            "Скидка 10% на иммерсивную медиа-выставку «Небо.Река». "
+            "Нажми кнопку ниже, чтобы получить индивидуальный код "
+            "(для участников клуба с подтверждённым номером телефона)."
+        ),
+        None,
+        _offers_nav_keyboard("promo", include_generate=True),
+    )
+
+
+async def _safe_edit_offers_message(
+    query,
+    text: str,
+    *,
+    parse_mode: str | None = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
+) -> None:
+    try:
+        await query.edit_message_text(
+            text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+        )
+    except BadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
+
+
 async def _send_offers_text(update: Update):
-    """Текст акций клуба + блок персонального промокода (раздел «Специальные предложения»)."""
+    """Раздел «Специальные предложения»: вкладки постоянные акции / персональный промокод."""
     uid = update.effective_user.id
-    base = _offers_discounts_text()
-    kb = None
-    out_text = base
-    parse_mode = None
-
-    if is_gift_promo_campaign_active():
-        try:
-            row = await db.get_user_promo(uid)
-        except Exception as e:
-            logger.error("get_user_promo in _send_offers_text: %s", e)
-            row = None
-        if row and row["active"]:
-            out_text = html.escape(base) + "\n\n" + format_user_promo_message(row["code"])
-            parse_mode = "HTML"
-        elif row and not row["active"]:
-            out_text = (
-                html.escape(base)
-                + "\n\n"
-                + html.escape(gift_promo_revoked_by_admin_user_message())
-            )
-            parse_mode = "HTML"
-        else:
-            kb = gift_promo_kb()
-
+    text, parse_mode, kb = await _build_offers_tab(uid, "auto")
     await update.effective_message.reply_text(
-        out_text,
+        text,
         reply_markup=kb,
         parse_mode=parse_mode,
     )
@@ -593,6 +661,26 @@ async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_offers_text(update)
 
 
+async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not await _check_phone_gate(update, context):
+        return
+    uid = update.effective_user.id
+    text, parse_mode, kb = await _build_offers_tab(uid, "general")
+    await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
+
+
+async def cb_offers_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not await _check_phone_gate(update, context):
+        return
+    uid = update.effective_user.id
+    text, parse_mode, kb = await _build_offers_tab(uid, "promo")
+    await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
+
+
 async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -622,9 +710,11 @@ async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not row["active"]:
         await query.message.reply_text(gift_promo_revoked_by_admin_user_message())
         return
-    await query.message.reply_text(
+    await _safe_edit_offers_message(
+        query,
         format_user_promo_message(row["code"]),
         parse_mode="HTML",
+        reply_markup=_offers_nav_keyboard("promo"),
     )
 
 
@@ -1290,6 +1380,8 @@ def main():
     # Inline callbacks
     app.add_handler(CallbackQueryHandler(cb_exhibition,  pattern="^cb_exhibition$"))
     app.add_handler(CallbackQueryHandler(cb_offers,      pattern="^cb_offers$"))
+    app.add_handler(CallbackQueryHandler(cb_offers_general, pattern="^cb_offers_general$"))
+    app.add_handler(CallbackQueryHandler(cb_offers_promo, pattern="^cb_offers_promo$"))
     app.add_handler(CallbackQueryHandler(cb_announcements, pattern="^cb_announcements$"))
     app.add_handler(CallbackQueryHandler(cb_certificates, pattern="^cb_certificates$"))
     app.add_handler(CallbackQueryHandler(cb_gen_gift_promo, pattern="^cb_gen_gift_promo$"))
