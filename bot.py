@@ -212,6 +212,12 @@ async def _check_phone_gate(
             "с подтверждённым номером.\n\n"
             "Поделись номером телефона, чтобы продолжить:"
         )
+    elif phone_stage.startswith("offers_promo"):
+        intro = (
+            "🎟 Персональная скидка и индивидуальный промокод доступны участникам клуба "
+            "с подтверждённым номером телефона.\n\n"
+            "Поделись номером телефона, чтобы продолжить:"
+        )
     else:
         intro = (
             "💝 Специальные предложения доступны только для участников клуба.\n\n"
@@ -454,6 +460,15 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if stage == "offers_promo_1":
+        context.user_data["phone_stage"] = "offers_promo_2"
+        await update.message.reply_text(
+            "Без номера персональная скидка и промокод недоступны.\n\n"
+            "Поделишься контактом?",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
     if stage == "gift_promo_1":
         context.user_data["phone_stage"] = "gift_promo_2"
         await update.message.reply_text(
@@ -473,6 +488,14 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_final_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки «Нет, не хочу» — финальный отказ от номера."""
     stage = context.user_data.pop("phone_stage", "")
+
+    if "offers_promo" in stage:
+        await update.message.reply_text(
+            "Персональная скидка и индивидуальный промокод доступны только "
+            "с подтверждённым номером телефона.",
+            reply_markup=bottom_keyboard(),
+        )
+        return
 
     if "offers" in stage:
         await update.message.reply_text(
@@ -502,8 +525,6 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_offers_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _check_phone_gate(update, context):
-        return
     await _send_offers_text(update)
 
 
@@ -610,8 +631,6 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_main_menu_msg(update)
 
 async def cmd_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _check_phone_gate(update, context):
-        return
     await _send_offers_text(update)
 
 async def cmd_contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -659,16 +678,12 @@ async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if not await _check_phone_gate(update, context):
-        return
     await _send_offers_text(update)
 
 
 async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if not await _check_phone_gate(update, context):
-        return
     uid = update.effective_user.id
     text, parse_mode, kb = await _build_offers_tab(uid, "general")
     await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
@@ -677,7 +692,7 @@ async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_offers_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if not await _check_phone_gate(update, context):
+    if not await _check_phone_gate(update, context, phone_stage="offers_promo_1"):
         return
     uid = update.effective_user.id
     text, parse_mode, kb = await _build_offers_tab(uid, "promo")
@@ -709,7 +724,15 @@ async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not await _check_phone_gate(update, context, phone_stage="gift_promo_1"):
         return
-    row = await db.issue_user_promo(user.id)
+    try:
+        row = await db.issue_user_promo(user.id)
+    except ValueError:
+        logger.warning("issue_user_promo declined: no phone for user %s", user.id)
+        await query.message.reply_text(
+            "Индивидуальный промокод доступен только после сохранения номера телефона "
+            "в профиле клуба.",
+        )
+        return
     if not row["active"]:
         await query.message.reply_text(gift_promo_revoked_by_admin_user_message())
         return

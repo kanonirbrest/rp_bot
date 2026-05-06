@@ -152,6 +152,9 @@ async def issue_user_promo(user_id: int) -> dict:
     existing = await get_user_promo(user_id)
     if existing:
         return existing
+    phone = await get_phone(user_id)
+    if not phone:
+        raise ValueError("промокод выдаётся только при сохранённом номере телефона")
     code = await _new_unique_promo_code()
     now = datetime.now().isoformat(timespec="seconds")
     await _execute(
