@@ -133,7 +133,7 @@ async def get_user_promo(user_id: int) -> dict | None:
 
 
 async def issue_user_promo(user_id: int) -> dict:
-    """Один промокод на пользователя: если уже есть — возвращаем существующий."""
+    """Один промокод на пользователя: если уже есть — возвращаем существующий (в т.ч. отозванный; новый не создаём)."""
     existing = await get_user_promo(user_id)
     if existing:
         return existing
