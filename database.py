@@ -102,6 +102,28 @@ async def init_db():
 
 
 _PROMO_ALPHABET = string.ascii_uppercase + string.digits
+_PROMO_CODE_PREFIX = "NR-"
+_PROMO_CODE_BODY_LEN = 8
+
+
+class PromoRedeemError(Exception):
+    """invalid_format | not_found | already_used"""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
+def normalize_promo_code(code: str) -> str | None:
+    normalized = code.strip().upper()
+    body = normalized[len(_PROMO_CODE_PREFIX):]
+    if (
+        not normalized.startswith(_PROMO_CODE_PREFIX)
+        or len(body) != _PROMO_CODE_BODY_LEN
+        or not all(c in _PROMO_ALPHABET for c in body)
+    ):
+        return None
+    return normalized
 
 
 async def _new_unique_promo_code() -> str:
@@ -172,6 +194,56 @@ async def deactivate_user_promo(user_id: int) -> bool:
         return False
     await _execute("UPDATE user_promos SET active = 0 WHERE user_id = ?", [user_id])
     return True
+
+
+async def get_promo_by_code(code: str) -> dict | None:
+    normalized = normalize_promo_code(code)
+    if not normalized:
+        return None
+    result = await _execute(
+        "SELECT user_id, code, active, created_at FROM user_promos WHERE code = ?",
+        [normalized],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    row = rows[0]
+    av = row["active"]
+    active = bool(int(av)) if av is not None else True
+    return {
+        "user_id": int(row["user_id"]),
+        "code": row["code"],
+        "active": active,
+        "created_at": row["created_at"],
+    }
+
+
+async def redeem_promo_code(code: str, *, discount_percent: int) -> dict:
+    """
+    Одноразово погасить промокод NR-* из базы бота.
+    Возвращает user_id, code, discount_percent.
+    """
+    normalized = normalize_promo_code(code)
+    if not normalized:
+        raise PromoRedeemError("invalid_format")
+
+    result = await _execute(
+        "UPDATE user_promos SET active = 0 WHERE code = ? AND active = 1 "
+        "RETURNING user_id, code",
+        [normalized],
+    )
+    rows = _rows(result)
+    if rows:
+        return {
+            "user_id": int(rows[0]["user_id"]),
+            "code": rows[0]["code"],
+            "discount_percent": discount_percent,
+        }
+
+    existing = await get_promo_by_code(normalized)
+    if existing is None:
+        raise PromoRedeemError("not_found")
+    raise PromoRedeemError("already_used")
 
 
 async def get_setting(key: str) -> str | None:

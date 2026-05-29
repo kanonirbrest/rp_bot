@@ -28,6 +28,7 @@ from telegram.ext import (
 
 import config
 import database as db
+import promo_api
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -1438,6 +1439,11 @@ def main():
     port = int(os.environ.get("PORT", 8443))
 
     if webhook_url:
+        if not config.PROMO_API_SECRET:
+            logger.warning(
+                "PROMO_API_SECRET не задан — POST /api/promo/redeem будет возвращать 401"
+            )
+        promo_api.patch_webhook_app()
         logger.info("Запуск в режиме webhook: %s", webhook_url)
         app.run_webhook(
             listen="0.0.0.0",
