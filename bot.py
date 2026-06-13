@@ -1444,6 +1444,7 @@ def main():
                 "PROMO_API_SECRET не задан — POST /api/promo/redeem будет возвращать 401"
             )
         promo_api.patch_webhook_app()
+        logger.info("Promo API: POST /api/promo/redeem")
         logger.info("Запуск в режиме webhook: %s", webhook_url)
         app.run_webhook(
             listen="0.0.0.0",
