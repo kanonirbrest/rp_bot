@@ -86,6 +86,7 @@ class PromoRedeemHandler(tornado.web.RequestHandler):
 
 def patch_webhook_app() -> None:
     """Добавляет /api/promo/redeem к Tornado-приложению webhook PTB."""
+    from telegram.ext import _updater as updater_module
     from telegram.ext._utils import webhookhandler as wh
 
     if getattr(wh.WebhookAppClass, "_promo_api_patched", False):
@@ -113,5 +114,8 @@ def patch_webhook_app() -> None:
         def log_request(self, handler: tornado.web.RequestHandler) -> None:
             pass
 
+    # PTB импортирует WebhookAppClass в _updater при загрузке модуля — патчим оба.
     wh.WebhookAppClass = PatchedWebhookApp  # type: ignore[misc, assignment]
+    updater_module.WebhookAppClass = PatchedWebhookApp  # type: ignore[misc, assignment]
     wh.WebhookAppClass._promo_api_patched = True
+    logger.info("Promo API route registered: POST /api/promo/redeem")
