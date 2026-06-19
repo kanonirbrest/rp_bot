@@ -59,6 +59,7 @@ PHONE        = "+375447383333"
 TG_USERNAME  = "DEI_by_RP"
 # Интерактивная карта (картинка, клики, полные тексты зон) — в репозитории GitHub Pages по этому URL.
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
+WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
 
 PROJECTS = [
     "Небо.Река 2026",
@@ -104,7 +105,7 @@ def gift_promo_revoked_by_admin_user_message() -> str:
 ZONE_NAMES = {
     1: "Карта состояний",
     2: "Соединение",
-    3: "Свет в руках",
+    3: "Мелодия момента",
     4: "Оранжерея",
     5: "Почерк на песке",
     6: "Палитра песков",
@@ -117,7 +118,7 @@ ZONE_NAMES = {
     13: "Кофейня и сувениры",
     14: "Полёт над облаками",
     15: "Путешествие по реке",
-    16: "Касание стихии (с мая)",
+    16: "Аллея цветов",
     17: "Водопад",
     18: "Сколько в тебе цветов",
     19: "Письмо себе в будущее",
@@ -172,6 +173,8 @@ async def _send_main_menu_msg(update: Update):
         photo = await db.get_setting("main_photo")
     except Exception:
         photo = None
+    if not photo:
+        photo = WELCOME_PHOTO_URL
     if photo:
         await update.effective_message.reply_photo(
             photo=photo, caption=text, reply_markup=main_menu_inline()
