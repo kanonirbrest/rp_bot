@@ -1199,6 +1199,35 @@ async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Установи пакет: pip install qrcode[pil]")
 
 
+async def _resolve_promo_user_id(raw: str) -> tuple[int | None, str]:
+    """
+    user_id для админ-команд промо.
+    kind: id | promo | phone | unknown
+    """
+    text = raw.strip()
+    if not text:
+        return None, "unknown"
+    upper = text.upper()
+    if upper.startswith("NR-"):
+        uid = await db.get_user_id_by_promo_code(text)
+        return (uid, "promo") if uid is not None else (None, "promo")
+    digits = db.normalize_phone_digits(text)
+    if text.startswith("+") or len(digits) >= 10:
+        uid = await db.get_user_id_by_phone(text)
+        return (uid, "phone") if uid is not None else (None, "phone")
+    if text.isdigit():
+        return int(text), "id"
+    return None, "unknown"
+
+
+def _promo_lookup_not_found_message(kind: str) -> str:
+    if kind == "promo":
+        return "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
+    if kind == "phone":
+        return "Пользователь с таким номером не найден. Номер должен быть в базе (Telegram-контакт)."
+    return "Укажите telegram_user_id, NR-XXXXXXXX или номер телефона (+375…)."
+
+
 async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -1241,20 +1270,16 @@ async def cmd_reissuepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             "Использование:\n"
             "/reissuepromo <telegram_user_id>\n"
-            "/reissuepromo <код> — например NR-XXXXXXXX\n\n"
+            "/reissuepromo NR-XXXXXXXX\n"
+            "/reissuepromo +375XXXXXXXXX\n\n"
             "Выдаёт новый активный промокод. Старый код перестаёт действовать."
         )
         return
-    raw = context.args[0].strip()
-    if raw.isdigit():
-        uid = int(raw)
-    else:
-        uid = await db.get_user_id_by_promo_code(raw)
-        if uid is None:
-            await msg.reply_text(
-                "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
-            )
-            return
+    raw = " ".join(context.args).strip()
+    uid, kind = await _resolve_promo_user_id(raw)
+    if uid is None:
+        await msg.reply_text(_promo_lookup_not_found_message(kind))
+        return
     old = await db.get_user_promo(uid)
     if not old:
         await msg.reply_text(f"У пользователя {uid} промокод ещё не создавался.")
@@ -1284,27 +1309,26 @@ async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             "Использование:\n"
             "/userpromo <telegram_user_id>\n"
-            "/userpromo <код> — например NR-XXXXXXXX"
+            "/userpromo NR-XXXXXXXX\n"
+            "/userpromo +375XXXXXXXXX"
         )
         return
-    raw = context.args[0].strip()
-    if raw.isdigit():
-        uid = int(raw)
-    else:
-        uid = await db.get_user_id_by_promo_code(raw)
-        if uid is None:
-            await msg.reply_text(
-                "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
-            )
-            return
+    raw = " ".join(context.args).strip()
+    uid, kind = await _resolve_promo_user_id(raw)
+    if uid is None:
+        await msg.reply_text(_promo_lookup_not_found_message(kind))
+        return
     row = await db.get_user_promo(uid)
     if not row:
         await msg.reply_text(f"У пользователя {uid} промокод ещё не создавался.")
         return
     st = "активен ✅" if row["active"] else "отключён ⛔️"
     created = html.escape(row.get("created_at") or "—")
+    phone = await db.get_phone(uid)
+    phone_line = f"Телефон: <code>{html.escape(phone)}</code>\n" if phone else ""
     await msg.reply_text(
         f"Пользователь <code>{uid}</code>\n"
+        f"{phone_line}"
         f"Код: <code>{html.escape(row['code'])}</code>\n"
         f"Статус: {st}\n"
         f"Создан: {created}",

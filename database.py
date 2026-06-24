@@ -150,6 +150,37 @@ async def get_user_id_by_promo_code(code: str) -> int | None:
     return int(rows[0]["user_id"])
 
 
+def normalize_phone_digits(phone: str) -> str:
+    return "".join(ch for ch in phone if ch.isdigit())
+
+
+def phones_match(stored: str, query: str) -> bool:
+    a = normalize_phone_digits(stored)
+    b = normalize_phone_digits(query)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if len(a) >= 9 and len(b) >= 9 and a[-9:] == b[-9:]:
+        return True
+    return False
+
+
+async def get_user_id_by_phone(phone: str) -> int | None:
+    """Находит user_id по номеру телефона (форматы +375…, пробелы, дефисы)."""
+    query = phone.strip()
+    if len(normalize_phone_digits(query)) < 7:
+        return None
+    result = await _execute(
+        "SELECT user_id, phone FROM users WHERE phone IS NOT NULL AND TRIM(phone) != ''"
+    )
+    for row in _rows(result):
+        stored = row.get("phone")
+        if stored and phones_match(stored, query):
+            return int(row["user_id"])
+    return None
+
+
 async def get_user_promo(user_id: int) -> dict | None:
     result = await _execute(
         "SELECT user_id, code, active, created_at FROM user_promos WHERE user_id = ?",
