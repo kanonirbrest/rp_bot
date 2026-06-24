@@ -1231,6 +1231,49 @@ async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def cmd_reissuepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    if not context.args:
+        await msg.reply_text(
+            "Использование:\n"
+            "/reissuepromo <telegram_user_id>\n"
+            "/reissuepromo <код> — например NR-XXXXXXXX\n\n"
+            "Выдаёт новый активный промокод. Старый код перестаёт действовать."
+        )
+        return
+    raw = context.args[0].strip()
+    if raw.isdigit():
+        uid = int(raw)
+    else:
+        uid = await db.get_user_id_by_promo_code(raw)
+        if uid is None:
+            await msg.reply_text(
+                "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
+            )
+            return
+    old = await db.get_user_promo(uid)
+    if not old:
+        await msg.reply_text(f"У пользователя {uid} промокод ещё не создавался.")
+        return
+    try:
+        row = await db.reissue_user_promo(uid)
+    except ValueError as e:
+        await msg.reply_text(str(e))
+        return
+    old_code = html.escape(old["code"])
+    await msg.reply_text(
+        f"✅ Новый промокод для <code>{uid}</code>\n"
+        f"Был: <code>{old_code}</code> (отключён)\n"
+        f"Стал: <code>{html.escape(row['code'])}</code> (активен ✅)\n"
+        f"Создан: {html.escape(row.get('created_at') or '—')}",
+        parse_mode="HTML",
+    )
+
+
 async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -1405,6 +1448,7 @@ def main():
     app.add_handler(CommandHandler("reviews", cmd_reviews))
     app.add_handler(CommandHandler("exportreviews", cmd_export_reviews))
     app.add_handler(CommandHandler("revokepromo", cmd_revokepromo))
+    app.add_handler(CommandHandler("reissuepromo", cmd_reissuepromo))
     app.add_handler(CommandHandler("userpromo", cmd_userpromo))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setmainphoto"), cmd_setmainphoto))

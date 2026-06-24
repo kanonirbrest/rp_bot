@@ -196,6 +196,24 @@ async def deactivate_user_promo(user_id: int) -> bool:
     return True
 
 
+async def reissue_user_promo(user_id: int) -> dict:
+    """
+    Перевыдаёт промокод: новый код, active=1, обновлённый created_at.
+    Старый код перестаёт существовать в базе.
+    """
+    if await get_user_promo(user_id) is None:
+        raise ValueError("промокод ещё не создавался")
+    code = await _new_unique_promo_code()
+    now = datetime.now().isoformat(timespec="seconds")
+    await _execute(
+        "UPDATE user_promos SET code = ?, active = 1, created_at = ? WHERE user_id = ?",
+        [code, now, user_id],
+    )
+    row = await get_user_promo(user_id)
+    assert row is not None
+    return row
+
+
 async def get_promo_by_code(code: str) -> dict | None:
     normalized = normalize_promo_code(code)
     if not normalized:
