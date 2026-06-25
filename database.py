@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import calendar
 import csv
 import io
 import os
 import secrets
 import string
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
@@ -16,6 +18,7 @@ TURSO_URL = os.getenv("TURSO_URL", "").replace("libsql://", "https://")
 TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
 
 _settings_cache: dict[str, str | None] = {}
+_PROMO_TZ = ZoneInfo("Europe/Minsk")
 
 
 def _arg(value):
@@ -107,11 +110,35 @@ _PROMO_CODE_BODY_LEN = 8
 
 
 class PromoRedeemError(Exception):
-    """invalid_format | not_found | already_used"""
+    """invalid_format | not_found | already_used | expired"""
 
     def __init__(self, code: str):
         self.code = code
         super().__init__(code)
+
+
+def promo_valid_until_date(created_at: str) -> date:
+    """Последний день действия: дата выдачи + 1 календарный месяц."""
+    issued = datetime.fromisoformat(created_at).date()
+    month = issued.month + 1
+    year = issued.year
+    if month > 12:
+        month = 1
+        year += 1
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, min(issued.day, last_day))
+
+
+def format_promo_valid_until(created_at: str) -> str:
+    v = promo_valid_until_date(created_at)
+    return f"{v.day:02d}.{v.month:02d}.{v.year}"
+
+
+def is_promo_still_valid(created_at: str | None) -> bool:
+    if not created_at:
+        return True
+    today = datetime.now(_PROMO_TZ).date()
+    return today <= promo_valid_until_date(created_at)
 
 
 def normalize_promo_code(code: str) -> str | None:
@@ -276,6 +303,14 @@ async def redeem_promo_code(code: str, *, discount_percent: int) -> dict:
     if not normalized:
         raise PromoRedeemError("invalid_format")
 
+    existing = await get_promo_by_code(normalized)
+    if existing is None:
+        raise PromoRedeemError("not_found")
+    if not existing["active"]:
+        raise PromoRedeemError("already_used")
+    if not is_promo_still_valid(existing.get("created_at")):
+        raise PromoRedeemError("expired")
+
     result = await _execute(
         "UPDATE user_promos SET active = 0 WHERE code = ? AND active = 1 "
         "RETURNING user_id, code",
@@ -289,9 +324,6 @@ async def redeem_promo_code(code: str, *, discount_percent: int) -> dict:
             "discount_percent": discount_percent,
         }
 
-    existing = await get_promo_by_code(normalized)
-    if existing is None:
-        raise PromoRedeemError("not_found")
     raise PromoRedeemError("already_used")
 
 

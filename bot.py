@@ -135,14 +135,20 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def format_user_promo_message(code: str) -> str:
+def format_user_promo_message(code: str, created_at: str | None = None) -> str:
     c = html.escape(code)
+    valid_until = (
+        db.format_promo_valid_until(created_at)
+        if created_at
+        else GIFT_PROMO_VALID_UNTIL
+    )
     return (
         "Твой персональный промокод на скидку 10% на иммерсивную медиа-выставку "
         f"«Небо.Река» — <code>{c}</code>\n\n"
-        "Как использовать: назови свой промокод на кассе при покупке билетов 👌🏻\n\n"
-        f"*промокод действует по {GIFT_PROMO_VALID_UNTIL}\n\n"
-        "Встретимся в DEI 🤍"
+        "Как использовать: при покупке билетов онлайн на сайте dei.by нужно ввести "
+        "промокод в соответствующее окно или назвать промокод кассиру в кассе "
+        "при покупке билетов 👌🏻\n\n"
+        f"*промокод действует по {valid_until}"
     )
 
 
@@ -312,7 +318,7 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
 
     if row and row["active"]:
         return (
-            format_user_promo_message(row["code"]),
+            format_user_promo_message(row["code"], row.get("created_at")),
             "HTML",
             _offers_nav_keyboard("promo"),
         )
@@ -437,7 +443,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
         else:
             await update.message.reply_text(
-                format_user_promo_message(row["code"]),
+                format_user_promo_message(row["code"], row.get("created_at")),
                 parse_mode="HTML",
             )
         return
@@ -745,7 +751,7 @@ async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await _safe_edit_offers_message(
         query,
-        format_user_promo_message(row["code"]),
+        format_user_promo_message(row["code"], row.get("created_at")),
         parse_mode="HTML",
         reply_markup=_offers_nav_keyboard("promo"),
     )

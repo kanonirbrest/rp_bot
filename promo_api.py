@@ -20,6 +20,7 @@ _REDEEM_ERRORS = {
     "invalid_format": 400,
     "not_found": 404,
     "already_used": 409,
+    "expired": 410,
 }
 
 
@@ -49,11 +50,6 @@ class PromoRedeemHandler(tornado.web.RequestHandler):
         if not _check_auth(self):
             self.set_status(401)
             self.write(json.dumps({"ok": False, "error": "unauthorized"}))
-            return
-
-        if not is_promo_campaign_active():
-            self.set_status(410)
-            self.write(json.dumps({"ok": False, "error": "campaign_expired"}))
             return
 
         try:
