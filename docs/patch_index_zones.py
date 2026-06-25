@@ -55,7 +55,7 @@ html = html.replace("ПЛАН ВЫСТАВКИ · 23 ЗОНЫ", "ПЛАН ВЫС
 html = html.replace("if (urlZone >= 1 && urlZone <= 22)", "if (urlZone >= 1 && urlZone <= 21)")
 html = re.sub(
     r"const PINK_ZONES\s*=\s*new Set\(\[[^\]]*\]\);",
-    "const PINK_ZONES   = new Set([4, 12, 13, 14, 19, 20, 21]);",
+    "const PINK_ZONES   = new Set([12, 14, 19, 20, 21]);",
     html,
     count=1,
 )
