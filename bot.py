@@ -65,6 +65,13 @@ EVENT_BELYE_NOCHI_PHOTO_URL = f"{MAP_BASE_URL}event-belye-nochi.png"
 EVENT_SADY_TICKET_URL = "https://dei-tickets.onrender.com/sady-snovideniy"
 EVENT_BELYE_NOCHI_TICKET_URL = "https://dei-tickets.onrender.com/belye-nochi-18"
 
+BROADCAST_EVENTS_TEXT = (
+    "📅 Новый раздел в боте!\n\n"
+    "Теперь доступны «Предстоящие события» — анонсы «Сады сновидений» "
+    "(6 июля) и «Белые ночи» (11 июля) с описанием, постерами и билетами.\n\n"
+    "Нажми кнопку ниже 👇"
+)
+
 PROJECTS = [
     "Небо.Река 2026",
     "Дом Рождества 3.0",
@@ -384,8 +391,41 @@ async def _send_offers_text(update: Update):
 
 
 # ── Onboarding ─────────────────────────────────────────────────────
+async def _events_deep_link(context: ContextTypes.DEFAULT_TYPE) -> str:
+    bot_username = (await context.bot.get_me()).username
+    return f"https://t.me/{bot_username}?start=events"
+
+
+async def _events_broadcast_kb(context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 Предстоящие события", url=await _events_deep_link(context))],
+    ])
+
+
+async def _handle_start_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not await db.user_exists(user.id):
+        await db.add_user(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+        logger.info("Новый пользователь (events): %s (%s)", user.full_name, user.id)
+    elif await db.get_phone(user.id):
+        await update.message.reply_text(
+            f"👋 С возвращением, {user.first_name}!",
+            reply_markup=bottom_keyboard(),
+        )
+    await _send_events_hub(update.effective_message)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+
+    if context.args and context.args[0] == "events":
+        await _handle_start_events(update, context)
+        return
 
     if await db.user_exists(user.id):
         phone = await db.get_phone(user.id)
@@ -1246,6 +1286,48 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cmd_broadcastevents(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    msg = update.message
+    user_ids = await db.get_all_user_ids()
+    if not user_ids:
+        await msg.reply_text("Нет пользователей для рассылки.")
+        return
+
+    kb = await _events_broadcast_kb(context)
+    status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
+
+    sent, failed = 0, 0
+    for user_id in user_ids:
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=BROADCAST_EVENTS_TEXT,
+                reply_markup=kb,
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+        await asyncio.sleep(0.05)
+
+    await status.edit_text(
+        f"✅ Рассылка «Предстоящие события» завершена\n\n"
+        f"Отправлено: {sent}\nНе доставлено: {failed}"
+    )
+
+
+async def cmd_eventslink(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    url = await _events_deep_link(context)
+    await update.message.reply_text(
+        f"Ссылка на раздел «Предстоящие события»:\n{url}\n\n"
+        "Рассылка: /broadcastevents",
+    )
+
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -1587,6 +1669,8 @@ def main():
     app.add_handler(CommandHandler("clearaboutphoto", cmd_clearaboutphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setaboutphoto"), cmd_setaboutphoto))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(CommandHandler("broadcastevents", cmd_broadcastevents))
+    app.add_handler(CommandHandler("eventslink", cmd_eventslink))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
     app.add_handler(CommandHandler("exportreviews", cmd_export_reviews))
     app.add_handler(CommandHandler("revokepromo", cmd_revokepromo))
