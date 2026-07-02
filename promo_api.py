@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import secrets
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 import tornado.web
 
@@ -15,19 +13,12 @@ import database as db
 
 logger = logging.getLogger(__name__)
 
-_PROMO_TIMEZONE = ZoneInfo("Europe/Minsk")
 _REDEEM_ERRORS = {
     "invalid_format": 400,
     "not_found": 404,
     "already_used": 409,
     "expired": 410,
 }
-
-
-def is_promo_campaign_active() -> bool:
-    d, m, y = config.PROMO_CAMPAIGN_VALID_UNTIL.strip().split(".")
-    last_day = date(int(y), int(m), int(d))
-    return datetime.now(_PROMO_TIMEZONE).date() <= last_day
 
 
 def _check_auth(handler: tornado.web.RequestHandler) -> bool:

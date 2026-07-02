@@ -4,8 +4,7 @@ import io
 import logging
 import os
 import re
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
+from datetime import datetime
 
 from telegram import (
     InlineKeyboardButton,
@@ -81,28 +80,7 @@ PROJECTS = [
     "Дом Рождества 1.0",
 ]
 
-# Единый текст выдачи промокода (10%, срок — см. GIFT_PROMO_VALID_UNTIL).
-GIFT_PROMO_VALID_UNTIL = "01.07.2026"
-GIFT_PROMO_TIMEZONE = ZoneInfo("Europe/Minsk")
-
-
-def _gift_promo_last_valid_day() -> date:
-    d, m, y = GIFT_PROMO_VALID_UNTIL.strip().split(".")
-    return date(int(y), int(m), int(d))
-
-
-def is_gift_promo_campaign_active() -> bool:
-    """Промокоды действуют включительно до GIFT_PROMO_VALID_UNTIL (календарный день, Минск)."""
-    today = datetime.now(GIFT_PROMO_TIMEZONE).date()
-    return today <= _gift_promo_last_valid_day()
-
-
-def gift_promo_campaign_expired_user_message() -> str:
-    return (
-        "Срок действия персональных промокодов на выставку «Небо.Река» истёк "
-        f"(акция была до {GIFT_PROMO_VALID_UNTIL}).\n\n"
-        "Билеты и подарочные сертификаты по-прежнему можно приобрести в кассе DEI 🤍"
-    )
+# Единый текст выдачи промокода (10%, срок — дата выдачи + 1 календарный месяц).
 
 
 def gift_promo_revoked_by_admin_user_message() -> str:
@@ -148,11 +126,10 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
 
 def format_user_promo_message(code: str, created_at: str | None = None) -> str:
     c = html.escape(code)
-    valid_until = (
-        db.format_promo_valid_until(created_at)
-        if created_at
-        else GIFT_PROMO_VALID_UNTIL
-    )
+    if created_at:
+        valid_until = db.format_promo_valid_until(created_at)
+    else:
+        valid_until = db.format_promo_valid_until(datetime.now().isoformat(timespec="seconds"))
     return (
         "Твой персональный промокод на скидку 10% на иммерсивную медиа-выставку "
         f"«Небо.Река» — <code>{c}</code>\n\n"
@@ -322,13 +299,6 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
         return _offers_discounts_text(), None, _offers_nav_keyboard("general")
 
     # вкладка «Персональная скидка»
-    if not is_gift_promo_campaign_active():
-        return (
-            gift_promo_campaign_expired_user_message(),
-            None,
-            _offers_nav_keyboard("promo"),
-        )
-
     try:
         row = await db.get_user_promo(user_id)
     except Exception as e:
@@ -483,9 +453,6 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if stage == "gift_promo_1":
-        if not is_gift_promo_campaign_active():
-            await update.message.reply_text(gift_promo_campaign_expired_user_message())
-            return
         existing = await db.get_user_promo(user.id)
         if existing and not existing["active"]:
             await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
@@ -849,9 +816,6 @@ async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if not is_gift_promo_campaign_active():
-        await query.message.reply_text(gift_promo_campaign_expired_user_message())
-        return
     user = update.effective_user
     existing = await db.get_user_promo(user.id)
     if existing and not existing["active"]:
