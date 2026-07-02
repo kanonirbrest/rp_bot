@@ -331,6 +331,16 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
     )
 
 
+async def _safe_answer_callback(query, text: str | None = None) -> None:
+    """Ответ на inline-кнопку; просроченный callback не роняет обработчик."""
+    try:
+        await query.answer(text)
+    except BadRequest as e:
+        err = str(e).lower()
+        if "query is too old" not in err and "query id is invalid" not in err:
+            raise
+
+
 async def _safe_edit_offers_message(
     query,
     text: str,
@@ -755,19 +765,19 @@ async def cmd_about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── Inline button callbacks ────────────────────────────────────────
 async def cb_exhibition(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_exhibition(query.message)
 
 
 async def cb_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_offers_text(update)
 
 
 async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     uid = update.effective_user.id
     text, parse_mode, kb = await _build_offers_tab(uid, "general")
     await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
@@ -775,7 +785,7 @@ async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_offers_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     if not await _check_phone_gate(update, context, phone_stage="offers_promo_1"):
         return
     uid = update.effective_user.id
@@ -785,37 +795,37 @@ async def cb_offers_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_events_hub(query.message)
 
 
 async def cb_event_sady(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_event_sady(query.message)
 
 
 async def cb_event_belye_nochi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_event_belye_nochi(query.message)
 
 
 async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_events_hub(query.message)
 
 
 async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_certificates(query.message)
 
 
 async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     user = update.effective_user
     existing = await db.get_user_promo(user.id)
     if existing and not existing["active"]:
@@ -907,7 +917,7 @@ FAQ_KB = InlineKeyboardMarkup([
 
 async def cb_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     try:
         await query.edit_message_text(FAQ_LIST_TEXT, reply_markup=FAQ_KB)
     except Exception:
@@ -916,7 +926,7 @@ async def cb_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     key = query.data
     text = FAQ_ANSWERS.get(key, "Ответ не найден.")
     if key in FAQ_WITH_CONTACT:
@@ -937,13 +947,13 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_giveaway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_giveaway(query.message, query.from_user)
 
 
 async def cb_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await query.message.reply_text(
         f"📞 Связаться с нами\n\n{PHONE}",
         reply_markup=InlineKeyboardMarkup([
@@ -975,14 +985,14 @@ async def _send_about(message):
 
 async def cb_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     await _send_about(query.message)
 
 
 # ── Review conversation ────────────────────────────────────────────
 async def review_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
-        await update.callback_query.answer()
+        await _safe_answer_callback(update.callback_query)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(p, callback_data=f"proj_{i}")]
         for i, p in enumerate(PROJECTS)
@@ -1001,7 +1011,7 @@ async def review_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def review_select_project(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     idx = int(query.data.replace("proj_", ""))
     project = PROJECTS[idx]
     context.user_data["review_project"] = project
@@ -1028,7 +1038,7 @@ async def review_select_project(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def review_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await _safe_answer_callback(query)
     rating = int(query.data.replace("rate_", ""))
     context.user_data["review_rating"] = rating
 
@@ -1059,7 +1069,7 @@ async def review_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def review_enter_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
-        await update.callback_query.answer()
+        await _safe_answer_callback(update.callback_query)
         context.user_data["review_email"] = None
         msg = update.callback_query.message
     else:
