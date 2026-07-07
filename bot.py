@@ -382,9 +382,18 @@ async def _events_broadcast_kb(context: ContextTypes.DEFAULT_TYPE) -> InlineKeyb
     ])
 
 
+_DB_UNAVAILABLE_MSG = "Сервис временно недоступен. Попробуйте через минуту."
+
+
 async def _handle_start_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if not await db.user_exists(user.id):
+    try:
+        exists = await db.user_exists(user.id)
+    except db.TursoError:
+        logger.error("Turso unavailable in start=events for user %s", user.id)
+        await update.message.reply_text(_DB_UNAVAILABLE_MSG)
+        return
+    if not exists:
         await db.add_user(
             user_id=user.id,
             username=user.username,
@@ -407,7 +416,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _handle_start_events(update, context)
         return
 
-    if await db.user_exists(user.id):
+    try:
+        exists = await db.user_exists(user.id)
+    except db.TursoError:
+        logger.error("Turso unavailable in cmd_start for user %s", user.id)
+        await update.message.reply_text(_DB_UNAVAILABLE_MSG)
+        return
+
+    if exists:
         phone = await db.get_phone(user.id)
         if phone:
             await update.message.reply_text(
@@ -417,7 +433,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _send_main_menu_msg(update)
             return
 
-    if not await db.user_exists(user.id):
+    if not exists:
         await db.add_user(
             user_id=user.id,
             username=user.username,

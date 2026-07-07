@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import calendar
 import csv
 import io
+import logging
 import os
 import secrets
 import string
@@ -14,11 +16,30 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 TURSO_URL = os.getenv("TURSO_URL", "").replace("libsql://", "https://")
 TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
 
+_HTTP_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+_EXECUTE_RETRIES = 3
+_EXECUTE_RETRY_DELAYS = (0.5, 1.0, 2.0)
+
+_client: httpx.AsyncClient | None = None
+
 _settings_cache: dict[str, str | None] = {}
 _PROMO_TZ = ZoneInfo("Europe/Minsk")
+
+
+class TursoError(Exception):
+    """База Turso недоступна после повторных попыток."""
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=_HTTP_TIMEOUT)
+    return _client
 
 
 def _arg(value):
@@ -42,17 +63,35 @@ async def _execute(sql: str, args=None) -> dict:
             {"type": "close"},
         ]
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.post(
-            f"{TURSO_URL}/v2/pipeline",
-            headers={
-                "Authorization": f"Bearer {TURSO_TOKEN}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-    r.raise_for_status()
-    return r.json()["results"][0]["response"]["result"]
+    headers = {
+        "Authorization": f"Bearer {TURSO_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    last_exc: Exception | None = None
+    for attempt in range(_EXECUTE_RETRIES):
+        try:
+            r = await _get_client().post(
+                f"{TURSO_URL}/v2/pipeline",
+                headers=headers,
+                json=payload,
+            )
+            r.raise_for_status()
+            return r.json()["results"][0]["response"]["result"]
+        except (httpx.TimeoutException, httpx.ConnectError) as exc:
+            last_exc = exc
+            if attempt < _EXECUTE_RETRIES - 1:
+                delay = _EXECUTE_RETRY_DELAYS[attempt]
+                logger.warning(
+                    "Turso timeout (попытка %s/%s), повтор через %.1f с: %s",
+                    attempt + 1,
+                    _EXECUTE_RETRIES,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+        except httpx.HTTPStatusError as exc:
+            raise TursoError(f"Turso HTTP {exc.response.status_code}") from exc
+    raise TursoError("Turso недоступна (таймаут)") from last_exc
 
 
 def _rows(result: dict) -> list[dict]:
