@@ -699,16 +699,28 @@ async def _send_certificates(message):
         "мы сохраним её в секрете до нужного момента.\n\n"
         "Приобретайте в кассе билеты с открытой датой на выставку «Небо.Река», "
         "которые мы упакуем в красивый подарочный конверт, "
-        "чтобы момент дарения уже стал особенным ❤️"
+        "чтобы момент дарения уже стал особенным ❤️\n\n"
+        "Также доступна покупка онлайн билетов с открытой датой по ссылке:\n"
+        "https://dei-tickets.onrender.com/buy-tickets-smr"
+        "?utm_source=tg&utm_medium=banner&utm_campaign=podarochniesertifikaty"
     )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "🎟 Купить онлайн",
+            url=(
+                "https://dei-tickets.onrender.com/buy-tickets-smr"
+                "?utm_source=tg&utm_medium=banner&utm_campaign=podarochniesertifikaty"
+            ),
+        )],
+    ])
     try:
         photo = await db.get_setting("cert_photo")
     except Exception:
         photo = None
     if photo:
-        await message.reply_photo(photo=photo, caption=text)
+        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
     else:
-        await message.reply_text(text)
+        await message.reply_text(text, reply_markup=kb)
 
 
 async def _send_giveaway(message, user):
