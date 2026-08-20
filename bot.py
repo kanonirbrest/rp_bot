@@ -64,14 +64,16 @@ MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
 EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka.png"
 EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy.png"
-EVENT_BELYE_NOCHI_PHOTO_URL = f"{MAP_BASE_URL}event-belye-nochi.png"
-EVENT_SADY_TICKET_URL = "https://dei-tickets.onrender.com/sady-snovideniy"
-EVENT_BELYE_NOCHI_TICKET_URL = "https://dei-tickets.onrender.com/belye-nochi-18"
+EVENT_SADY_INFO_URL = (
+    "https://dei.by/sady_snovideniy"
+    "?utm_source=tg&utm_medium=banner&utm_campaign=sadysnovidenii"
+)
+EVENT_AKSYUTIK_PHOTO_URL = f"{MAP_BASE_URL}event-aksyutik.png"
 
 BROADCAST_EVENTS_TEXT = (
     "📅 Новый раздел в боте!\n\n"
     "Теперь доступны «Предстоящие события» — анонсы «Сады сновидений» "
-    "(6 июля) и «Белые ночи» (11 июля) с афишей и описанием уже опубликованы.\n\n"
+    "и концерта Ксении Аксютик с афишей и описанием уже опубликованы.\n\n"
     "Нажми кнопку ниже 👇"
 )
 
@@ -146,7 +148,7 @@ def format_user_promo_message(code: str, created_at: str | None = None) -> str:
 def events_hub_inline() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("«Сады сновидений» 🌙", callback_data="cb_event_sady")],
-        [InlineKeyboardButton("«Белые ночи» 🤍", callback_data="cb_event_belye_nochi")],
+        [InlineKeyboardButton("Концерт Ксении Аксютик 🎤", callback_data="cb_event_aksyutik")],
     ])
 
 
@@ -625,35 +627,27 @@ async def _send_exhibition(message):
 
 
 EVENT_SADY_TEXT = (
-    "6 июля на выставке «Небо.Река» пройдёт премьера иммерсивной танцевальной "
-    "мистерии «Сады сновидений», где зрители станут частью происходящего. "
-    "Как это будет?\n\n"
-    "По задумке авторов, привычной сцены здесь не будет. Пространство объединит "
+    "Ежемесячно на выставке «Небо.Река» проходит иммерсивная танцевальная "
+    "мистерия «Сады сновидений», где зрители становятся частью происходящего. "
+    "Как это происходит?\n\n"
+    "По задумке авторов, привычной сцены здесь нет. Пространство объединяет "
     "современный танец, живую музыку и визуальные эффекты в единое действие, "
-    "внутри которого окажутся зрители. Артисты будут взаимодействовать с потоками "
-    "воды и светом, а музыка будет рождаться прямо в моменте вместе с происходящим. "
-    "Дождь, дым, лазерные эффекты и масштабные проекции на парящую планету станут "
-    "частью единого действия.\n\n"
-    "Стоимость билетов: от 91 до 151 BYN. В программу входит посещение выставки "
+    "внутри которого оказываются зрители. Артисты взаимодействуют с потоками "
+    "воды и светом, а музыка рождается прямо в моменте вместе с происходящим. "
+    "Дождь, дым, лазерные эффекты и масштабные проекции на парящую планету "
+    "становятся частью единого действия.\n\n"
+    "Стоимость билетов: от 90 до 150 BYN. В программу входит посещение выставки "
     "«Небо.Река» с 18:30 до 20:00, после чего в 20:00 начнётся танцевальная "
     "мистерия «Сады сновидений». Длительность шоу — 60 минут.\n\n"
+    "Даты ближайших шоу — 7 и 8 сентября.\n\n"
     "Только для Клуба друзей Razman Production — скидка 5% на билеты по промокоду "
     "DREAM5"
 )
 
-EVENT_BELYE_NOCHI_TEXT = (
-    "«Небо.Река» приглашает на вечеринку «Белые ночи» в стиле R&B 2000-х — ночь, "
-    "где каждый трек будет попадать прямо в сердце ♥️\n\n"
-    "🎧 DJ's Kira Miller & Bazhen\n\n"
-    "За пультом — проводники в золотую эпоху MTV. Только хиты, которые знает каждый: "
-    "Beyoncé, 50 Cent, Justin Timberlake, Sean Paul, Destiny's Child, Nelly, "
-    "Timbaland, Black Eyed Peas и другие легенды нулевых\n\n"
-    "🍸 Авторские коктейли и любимая классика\n"
-    "🪐 Огромная РОЗОВАЯ ПЛАНЕТА над танцполом\n"
-    "🤍 Dress code: WHITE ONLY\n"
-    "🎫 Стоимость: 60 BYN (при покупке в кассе перед мероприятием — 70 BYN)\n"
-    "🗓️ Дата: 11 июля\n\n"
-    "Если ты давно ждал вечеринку, ради которой стоит выйти из дома — это она!"
+# Описание и афиша концерта — заполняются следующим апдейтом.
+EVENT_AKSYUTIK_TEXT = (
+    "Концерт Ксении Аксютик 🎤\n\n"
+    "Анонс скоро — следи за обновлениями!"
 )
 
 
@@ -673,19 +667,25 @@ async def _send_events_hub(message):
 async def _send_event_sady(message):
     photo = await _event_photo("event_sady_photo", EVENT_SADY_PHOTO_URL)
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟 Купить билет", url=EVENT_SADY_TICKET_URL)],
+        [InlineKeyboardButton("Подробнее", url=EVENT_SADY_INFO_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
     ])
     await message.reply_photo(photo=photo, caption=EVENT_SADY_TEXT, reply_markup=kb)
 
 
-async def _send_event_belye_nochi(message):
-    photo = await _event_photo("event_belye_nochi_photo", EVENT_BELYE_NOCHI_PHOTO_URL)
+async def _send_event_aksyutik(message):
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟 Купить билет", url=EVENT_BELYE_NOCHI_TICKET_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
     ])
-    await message.reply_photo(photo=photo, caption=EVENT_BELYE_NOCHI_TEXT, reply_markup=kb)
+    photo = None
+    try:
+        photo = await db.get_setting("event_aksyutik_photo")
+    except Exception:
+        photo = None
+    if photo:
+        await message.reply_photo(photo=photo, caption=EVENT_AKSYUTIK_TEXT, reply_markup=kb)
+    else:
+        await message.reply_text(EVENT_AKSYUTIK_TEXT, reply_markup=kb)
 
 
 async def _send_announcements(message):
@@ -835,10 +835,10 @@ async def cb_event_sady(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_event_sady(query.message)
 
 
-async def cb_event_belye_nochi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cb_event_aksyutik(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await _safe_answer_callback(query)
-    await _send_event_belye_nochi(query.message)
+    await _send_event_aksyutik(query.message)
 
 
 async def cb_announcements(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1152,7 +1152,7 @@ async def cmd_setphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.set_setting("announcement_photo", file_id)
     await update.message.reply_text(
         "✅ Фото обновлено! (legacy: announcement_photo; для событий — "
-        "/setsadyphoto и /setbelyenochiphoto)"
+        "/setsadyphoto и /setaksyutikphoto)"
     )
 
 
@@ -1167,17 +1167,17 @@ async def cmd_setsadyphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Фото «Сады сновидений» обновлено!")
 
 
-async def cmd_setbelyenochiphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_setaksyutikphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
     if not update.message.photo:
         await update.message.reply_text(
-            "Отправь фото с командой /setbelyenochiphoto в подписи."
+            "Отправь фото с командой /setaksyutikphoto в подписи."
         )
         return
     file_id = update.message.photo[-1].file_id
-    await db.set_setting("event_belye_nochi_photo", file_id)
-    await update.message.reply_text("✅ Фото «Белые ночи» обновлено!")
+    await db.set_setting("event_aksyutik_photo", file_id)
+    await update.message.reply_text("✅ Фото «Концерт Ксении Аксютик» обновлено!")
 
 
 async def cmd_setgif(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1667,7 +1667,7 @@ def main():
     app.add_handler(CommandHandler("qrzone", cmd_qrzone))
     app.add_handler(CommandHandler("setphoto", cmd_setphoto))
     app.add_handler(CommandHandler("setsadyphoto", cmd_setsadyphoto))
-    app.add_handler(CommandHandler("setbelyenochiphoto", cmd_setbelyenochiphoto))
+    app.add_handler(CommandHandler("setaksyutikphoto", cmd_setaksyutikphoto))
     app.add_handler(CommandHandler("setgif", cmd_setgif))
     app.add_handler(CommandHandler("setmainphoto", cmd_setmainphoto))
     app.add_handler(CommandHandler("setexhibitionphoto", cmd_setexhibitionphoto))
@@ -1686,8 +1686,8 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setphoto"), cmd_setphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setsadyphoto"), cmd_setsadyphoto))
     app.add_handler(MessageHandler(
-        filters.PHOTO & filters.CaptionRegex(r"(?i)/setbelyenochiphoto"),
-        cmd_setbelyenochiphoto,
+        filters.PHOTO & filters.CaptionRegex(r"(?i)/setaksyutikphoto"),
+        cmd_setaksyutikphoto,
     ))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setmainphoto"), cmd_setmainphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setexhibitionphoto"), cmd_setexhibitionphoto))
@@ -1705,7 +1705,7 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_offers_promo, pattern="^cb_offers_promo$"))
     app.add_handler(CallbackQueryHandler(cb_events, pattern="^cb_events$"))
     app.add_handler(CallbackQueryHandler(cb_event_sady, pattern="^cb_event_sady$"))
-    app.add_handler(CallbackQueryHandler(cb_event_belye_nochi, pattern="^cb_event_belye_nochi$"))
+    app.add_handler(CallbackQueryHandler(cb_event_aksyutik, pattern="^cb_event_aksyutik$"))
     app.add_handler(CallbackQueryHandler(cb_announcements, pattern="^cb_announcements$"))
     app.add_handler(CallbackQueryHandler(cb_certificates, pattern="^cb_certificates$"))
     app.add_handler(CallbackQueryHandler(cb_gen_gift_promo, pattern="^cb_gen_gift_promo$"))
