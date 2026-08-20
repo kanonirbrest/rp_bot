@@ -51,7 +51,10 @@ RE_MENU_REVIEW  = r".*(Оставить отзыв).*"
 SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 
 # ── Constants ──────────────────────────────────────────────────────
-TICKET_URL   = "https://www.ticketpro.by/raznoe/neboreka---planeta-posle-shuma/"
+TICKET_URL   = (
+    "https://dei-tickets.onrender.com/buy-tickets-smr"
+    "?utm_source=tg&utm_medium=banner&utm_campaign=knopka_vistavka"
+)
 ABOUT_URL    = "https://dei.by/about"
 YANDEX_URL   = "https://yandex.ru/navi/org/dom_eksperimentalnogo_iskusstva/194412181469?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
@@ -59,6 +62,7 @@ TG_USERNAME  = "DEI_by_RP"
 # Интерактивная карта (картинка, клики, полные тексты зон) — в репозитории GitHub Pages по этому URL.
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
+EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka.png"
 EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy.png"
 EVENT_BELYE_NOCHI_PHOTO_URL = f"{MAP_BASE_URL}event-belye-nochi.png"
 EVENT_SADY_TICKET_URL = "https://dei-tickets.onrender.com/sady-snovideniy"
@@ -604,7 +608,7 @@ async def _send_exhibition(message):
         "уникальный мир, где природа вдохновляет, технологии удивляют, живая музыка трогает.\n\n"
         "«Небо.Река» выключает городскую «громкость» и возвращает чувствительность — "
         "даёт возможность остановиться, выдохнуть и прожить редкий опыт присутствия «здесь и сейчас».\n\n"
-        "📅 21 марта — 23 августа\n"
+        "📅 21 марта — 08 ноября\n"
         "📍 DEI (Дом Экспериментального Искусства)\n"
         "Минск, пр-т. Машерова 15/1\n\n"
         "Подробности и билеты на сайте:"
@@ -612,14 +616,8 @@ async def _send_exhibition(message):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
     ])
-    try:
-        photo = await db.get_setting("exhibition_photo")
-    except Exception:
-        photo = None
-    if photo:
-        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
-    else:
-        await message.reply_text(text, reply_markup=kb)
+    photo = await _event_photo("exhibition_photo", EXHIBITION_PHOTO_URL)
+    await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
 
 
 EVENT_SADY_TEXT = (
