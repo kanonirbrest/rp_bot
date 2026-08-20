@@ -69,6 +69,11 @@ EVENT_SADY_INFO_URL = (
     "?utm_source=tg&utm_medium=banner&utm_campaign=sadysnovidenii"
 )
 EVENT_AKSYUTIK_PHOTO_URL = f"{MAP_BASE_URL}event-aksyutik.png"
+EVENT_AKSYUTIK_TICKET_URL = (
+    "https://www.ticketpro.by/bilety-na-koncert/"
+    "kseniya-aksyutik-i-gruppa-aks-band-29-sentyabrya-2026/"
+    "?utm_source=tg&utm_medium=banner&utm_campaign=aksutik"
+)
 
 BROADCAST_EVENTS_TEXT = (
     "📅 Новый раздел в боте!\n\n"
@@ -644,10 +649,30 @@ EVENT_SADY_TEXT = (
     "DREAM5"
 )
 
-# Описание и афиша концерта — заполняются следующим апдейтом.
 EVENT_AKSYUTIK_TEXT = (
-    "Концерт Ксении Аксютик 🎤\n\n"
-    "Анонс скоро — следи за обновлениями!"
+    "Музыкальный спектакль Ксении Аксютик «Я начинаюсь»\n\n"
+    "29 сентября Финалистка главного вокального шоу «Голос» Ксения Аксютик "
+    "даст сольный концерт в пространстве «Небо.Река». Это событие вы точно "
+    "запомните!\n\n"
+    "Razman Production — команда, которая делает мощно, искренне и красиво. "
+    "Вместе мы создали авторский музыкальный спектакль, настоящее откровение "
+    "на сцене.\n\n"
+    "Вы услышите знакомые песни, но в абсолютно новом звучании. Авторская "
+    "обработка превратит хиты в саундтрек к жизни: где-то щемящий, где-то "
+    "рвущий струны, где-то дающий надежду.\n\n"
+    "В моменте на сцене будет работать более 10 музыкантов, детский хор, "
+    "танцоры частной труппы Razman Production LAVA, а огромная планета над "
+    "водой станет главным визуальным символом спектакля.\n\n"
+    "🎫 Стоимость: от 95 до 195 BYN\n"
+    "🗓️ Дата: 29 сентября\n"
+    "Время: 19:00\n"
+    "Место: DEI (Дом Экспериментального Искусства), Минск, "
+    "проспект Машерова 15/1\n\n"
+    "Что входит в стоимость билета:\n"
+    "19:00 – 20:00 | Посещение выставки «Небо.Река»\n"
+    "20:00 – 21:30 | Авторский музыкальный спектакль «Я начинаюсь» "
+    "Ксении Аксютик и группы AKS Band\n\n"
+    "Возрастное ограничение: 6+"
 )
 
 
@@ -674,18 +699,17 @@ async def _send_event_sady(message):
 
 
 async def _send_event_aksyutik(message):
+    """Афиша отдельно: описание длиннее лимита caption (1024)."""
+    photo = await _event_photo("event_aksyutik_photo", EVENT_AKSYUTIK_PHOTO_URL)
     kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎟 Купить билет", url=EVENT_AKSYUTIK_TICKET_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
     ])
-    photo = None
     try:
-        photo = await db.get_setting("event_aksyutik_photo")
+        await message.reply_photo(photo=photo)
     except Exception:
-        photo = None
-    if photo:
-        await message.reply_photo(photo=photo, caption=EVENT_AKSYUTIK_TEXT, reply_markup=kb)
-    else:
-        await message.reply_text(EVENT_AKSYUTIK_TEXT, reply_markup=kb)
+        logger.warning("event aksyutik photo failed, sending text only")
+    await message.reply_text(EVENT_AKSYUTIK_TEXT, reply_markup=kb)
 
 
 async def _send_announcements(message):
