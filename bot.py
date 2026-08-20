@@ -62,7 +62,7 @@ TG_USERNAME  = "DEI_by_RP"
 # Интерактивная карта (картинка, клики, полные тексты зон) — в репозитории GitHub Pages по этому URL.
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
-EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka.png"
+EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka-v2.png"
 EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy-v2.png"
 EVENT_SADY_INFO_URL = (
     "https://dei.by/sady_snovideniy"
