@@ -63,7 +63,7 @@ TG_USERNAME  = "DEI_by_RP"
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
 EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka.png"
-EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy.png"
+EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy-v2.png"
 EVENT_SADY_INFO_URL = (
     "https://dei.by/sady_snovideniy"
     "?utm_source=tg&utm_medium=banner&utm_campaign=sadysnovidenii"
