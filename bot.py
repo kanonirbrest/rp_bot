@@ -657,17 +657,15 @@ EVENT_AKSYUTIK_TEXT = (
     "Razman Production — команда, которая делает мощно, искренне и красиво. "
     "Вместе мы создали авторский музыкальный спектакль, настоящее откровение "
     "на сцене.\n\n"
-    "Вы услышите знакомые песни, но в абсолютно новом звучании. Авторская "
+    "Вы услышите знакомые песни, в абсолютно новом звучании. Авторская "
     "обработка превратит хиты в саундтрек к жизни: где-то щемящий, где-то "
     "рвущий струны, где-то дающий надежду.\n\n"
     "В моменте на сцене будет работать более 10 музыкантов, детский хор, "
-    "танцоры частной труппы Razman Production LAVA, а огромная планета над "
+    "танцоры труппы Razman Production LAVA, а огромная планета над "
     "водой станет главным визуальным символом спектакля.\n\n"
     "🎫 Стоимость: от 95 до 195 BYN\n"
     "🗓️ Дата: 29 сентября\n"
-    "Время: 19:00\n"
-    "Место: DEI (Дом Экспериментального Искусства), Минск, "
-    "проспект Машерова 15/1\n\n"
+    "Время: 19:00\n\n"
     "Что входит в стоимость билета:\n"
     "19:00 – 20:00 | Посещение выставки «Небо.Река»\n"
     "20:00 – 21:30 | Авторский музыкальный спектакль «Я начинаюсь» "
@@ -699,17 +697,12 @@ async def _send_event_sady(message):
 
 
 async def _send_event_aksyutik(message):
-    """Афиша отдельно: описание длиннее лимита caption (1024)."""
     photo = await _event_photo("event_aksyutik_photo", EVENT_AKSYUTIK_PHOTO_URL)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=EVENT_AKSYUTIK_TICKET_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
     ])
-    try:
-        await message.reply_photo(photo=photo)
-    except Exception:
-        logger.warning("event aksyutik photo failed, sending text only")
-    await message.reply_text(EVENT_AKSYUTIK_TEXT, reply_markup=kb)
+    await message.reply_photo(photo=photo, caption=EVENT_AKSYUTIK_TEXT, reply_markup=kb)
 
 
 async def _send_announcements(message):
