@@ -688,7 +688,7 @@ async def _send_events_hub(message):
 
 
 async def _send_event_sady(message):
-    photo = await _event_photo("event_sady_photo", EVENT_SADY_PHOTO_URL)
+    photo = await _event_photo("event_sady_photo_v2", EVENT_SADY_PHOTO_URL)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("Подробнее", url=EVENT_SADY_INFO_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
@@ -697,7 +697,7 @@ async def _send_event_sady(message):
 
 
 async def _send_event_aksyutik(message):
-    photo = await _event_photo("event_aksyutik_photo", EVENT_AKSYUTIK_PHOTO_URL)
+    photo = await _event_photo("event_aksyutik_photo_v2", EVENT_AKSYUTIK_PHOTO_URL)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=EVENT_AKSYUTIK_TICKET_URL)],
         [InlineKeyboardButton("← К событиям", callback_data="cb_events")],
@@ -1180,7 +1180,7 @@ async def cmd_setsadyphoto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Отправь фото с командой /setsadyphoto в подписи.")
         return
     file_id = update.message.photo[-1].file_id
-    await db.set_setting("event_sady_photo", file_id)
+    await db.set_setting("event_sady_photo_v2", file_id)
     await update.message.reply_text("✅ Фото «Сады сновидений» обновлено!")
 
 
@@ -1193,7 +1193,7 @@ async def cmd_setaksyutikphoto(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
     file_id = update.message.photo[-1].file_id
-    await db.set_setting("event_aksyutik_photo", file_id)
+    await db.set_setting("event_aksyutik_photo_v2", file_id)
     await update.message.reply_text("✅ Фото «Концерт Ксении Аксютик» обновлено!")
 
 
