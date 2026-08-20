@@ -627,7 +627,7 @@ async def _send_exhibition(message):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
     ])
-    photo = await _event_photo("exhibition_photo", EXHIBITION_PHOTO_URL)
+    photo = await _event_photo("exhibition_photo_v2", EXHIBITION_PHOTO_URL)
     await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
 
 
@@ -1226,7 +1226,7 @@ async def cmd_setexhibitionphoto(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("Отправь фото с командой /setexhibitionphoto в подписи.")
         return
     file_id = update.message.photo[-1].file_id
-    await db.set_setting("exhibition_photo", file_id)
+    await db.set_setting("exhibition_photo_v2", file_id)
     await update.message.reply_text("✅ Фото выставки обновлено!")
 
 
