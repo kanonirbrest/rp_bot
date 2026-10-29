@@ -493,8 +493,40 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if contact.user_id != user.id:
         return
 
-    await db.save_phone(user.id, contact.phone_number)
-    logger.info("Телефон сохранён для %s: %s", user.id, contact.phone_number)
+    phone_number = (contact.phone_number or "").strip()
+    if not phone_number:
+        await update.message.reply_text(
+            "Не удалось прочитать номер. Нажми кнопку ниже ещё раз.",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
+    # Строка создаётся только в /start. Контакт с промокода мог прийти раньше —
+    # без INSERT обновление номера меняет 0 строк и Turso всё равно отвечает 200.
+    if not await db.user_exists(user.id):
+        await db.add_user(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+        logger.info(
+            "Новый пользователь при сохранении телефона: %s (%s)",
+            user.full_name,
+            user.id,
+        )
+
+    await db.save_phone(user.id, phone_number)
+    saved = await db.get_phone(user.id)
+    if not saved:
+        logger.error("Телефон не записался для %s", user.id)
+        await update.message.reply_text(
+            "Не удалось сохранить номер. Нажми кнопку ниже ещё раз.",
+            reply_markup=_phone_request_keyboard(is_retry=True),
+        )
+        return
+
+    logger.info("Телефон сохранён для %s: %s", user.id, phone_number)
     stage = context.user_data.pop("phone_stage", None)
 
     await update.message.reply_text(
@@ -514,7 +546,15 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if existing and not existing["active"]:
             await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
             return
-        row = await db.issue_user_promo(user.id)
+        try:
+            row = await db.issue_user_promo(user.id)
+        except ValueError:
+            logger.warning("issue_user_promo declined: no phone for user %s", user.id)
+            await update.message.reply_text(
+                "Индивидуальный промокод доступен только после сохранения номера телефона "
+                "в профиле клуба.",
+            )
+            return
         if not row["active"]:
             await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
         else:
