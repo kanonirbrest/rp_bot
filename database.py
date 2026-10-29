@@ -42,6 +42,21 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+async def _reset_client() -> None:
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
+
+
+def _exc_brief(exc: BaseException) -> str:
+    parts = [f"{type(exc).__name__}: {exc}"]
+    cause = exc.__cause__
+    if cause is not None:
+        parts.append(f"cause={type(cause).__name__}: {cause}")
+    return " | ".join(parts)
+
+
 def _arg(value):
     if value is None:
         return {"type": "null"}
@@ -77,21 +92,24 @@ async def _execute(sql: str, args=None) -> dict:
             )
             r.raise_for_status()
             return r.json()["results"][0]["response"]["result"]
-        except (httpx.TimeoutException, httpx.ConnectError) as exc:
+        except httpx.TransportError as exc:
+            will_retry = attempt < _EXECUTE_RETRIES - 1
+            logger.warning(
+                "Turso сбой сети (попытка %s/%s, повтор=%s): %s | sql=%s",
+                attempt + 1,
+                _EXECUTE_RETRIES,
+                "да" if will_retry else "нет",
+                _exc_brief(exc),
+                " ".join(sql.split())[:120],
+            )
             last_exc = exc
-            if attempt < _EXECUTE_RETRIES - 1:
-                delay = _EXECUTE_RETRY_DELAYS[attempt]
-                logger.warning(
-                    "Turso timeout (попытка %s/%s), повтор через %.1f с: %s",
-                    attempt + 1,
-                    _EXECUTE_RETRIES,
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
+            if not will_retry:
+                raise TursoError("Turso недоступна (сеть)") from exc
+            await _reset_client()
+            await asyncio.sleep(_EXECUTE_RETRY_DELAYS[attempt])
         except httpx.HTTPStatusError as exc:
             raise TursoError(f"Turso HTTP {exc.response.status_code}") from exc
-    raise TursoError("Turso недоступна (таймаут)") from last_exc
+    raise TursoError("Turso недоступна (сеть)") from last_exc
 
 
 def _rows(result: dict) -> list[dict]:

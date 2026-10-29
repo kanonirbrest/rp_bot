@@ -314,11 +314,7 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
         return _offers_discounts_text(), None, _offers_nav_keyboard("general")
 
     # вкладка «Персональная скидка»
-    try:
-        row = await db.get_user_promo(user_id)
-    except Exception as e:
-        logger.error("get_user_promo in _build_offers_tab promo: %s", e)
-        row = None
+    row = await db.get_user_promo(user_id)
 
     if row and row["active"]:
         return (
@@ -400,13 +396,33 @@ async def _events_broadcast_kb(context: ContextTypes.DEFAULT_TYPE) -> InlineKeyb
 _DB_UNAVAILABLE_MSG = "Сервис временно недоступен. Попробуйте через минуту."
 
 
+async def _reply_db_unavailable(update: Update | None) -> None:
+    if update is None:
+        return
+    query = update.callback_query
+    if query:
+        await _safe_answer_callback(query)
+        if query.message:
+            try:
+                await query.message.reply_text(_DB_UNAVAILABLE_MSG)
+            except Exception:
+                pass
+        return
+    msg = update.effective_message
+    if msg:
+        try:
+            await msg.reply_text(_DB_UNAVAILABLE_MSG)
+        except Exception:
+            pass
+
+
 async def _handle_start_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     try:
         exists = await db.user_exists(user.id)
     except db.TursoError:
-        logger.error("Turso unavailable in start=events for user %s", user.id)
-        await update.message.reply_text(_DB_UNAVAILABLE_MSG)
+        logger.warning("Turso unavailable in start=events for user %s", user.id)
+        await _reply_db_unavailable(update)
         return
     if not exists:
         await db.add_user(
@@ -434,8 +450,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         exists = await db.user_exists(user.id)
     except db.TursoError:
-        logger.error("Turso unavailable in cmd_start for user %s", user.id)
-        await update.message.reply_text(_DB_UNAVAILABLE_MSG)
+        logger.warning("Turso unavailable in cmd_start for user %s", user.id)
+        await _reply_db_unavailable(update)
         return
 
     if exists:
@@ -1606,11 +1622,19 @@ def main():
 
     async def error_handler(update, context):
         import traceback
-        logger.error("Ошибка: %s", context.error, exc_info=context.error)
+        err = context.error
+        if isinstance(err, db.TursoError):
+            logger.warning("Turso недоступна: %s", err)
+            await _reply_db_unavailable(update)
+            return
+        cause = err.__cause__
+        summary = f"{type(err).__name__}: {err}"
+        if cause is not None:
+            summary += f" | cause={type(cause).__name__}: {cause}"
+        logger.error("Ошибка: %s", summary, exc_info=err)
 
-        tb = ''.join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
+        tb = ''.join(traceback.format_exception(type(err), err, err.__traceback__))
+        tb_tail = tb if len(tb) <= 2800 else "…\n" + tb[-2800:]
 
         user_info = ''
         if update and update.effective_user:
@@ -1620,7 +1644,8 @@ def main():
         msg = (
             f"🚨 <b>Ошибка в боте</b>\n\n"
             f"{user_info}"
-            f"<pre>{tb[:3500]}</pre>"
+            f"<b>{html.escape(summary[:700])}</b>\n\n"
+            f"<pre>{html.escape(tb_tail)}</pre>"
         )
 
         for admin_id in list(config.ADMIN_IDS):
