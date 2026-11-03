@@ -1315,17 +1315,26 @@ async def cmd_clearaboutphoto(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("✅ Фото раздела «О RAZMAN production» удалено.")
 
 
+_BROADCAST_CMD_RE = re.compile(r"(?i)^/(broadcasttest|broadcast)(?:@\w+)?\s*")
+
+
+def _broadcast_is_test(message) -> bool:
+    raw = (message.caption or message.text or "").lstrip()
+    match = _BROADCAST_CMD_RE.match(raw)
+    return bool(match and match.group(1).lower() == "broadcasttest")
+
+
+def _broadcast_caption(caption: str) -> str | None:
+    text = _BROADCAST_CMD_RE.sub("", caption.lstrip(), count=1).strip()
+    return text or None
+
+
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
 
     msg = update.message
-    user_ids = await db.get_all_user_ids()
-
-    if not user_ids:
-        await msg.reply_text("Нет пользователей для рассылки.")
-        return
-
+    is_test = _broadcast_is_test(msg)
     text = " ".join(context.args) if context.args else None
     has_photo = bool(msg.photo)
     has_animation = bool(msg.animation)
@@ -1333,15 +1342,27 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text and not has_photo and not has_animation:
         await msg.reply_text(
             "Как использовать рассылку:\n\n"
-            "• Текст: `/broadcast Ваш текст`\n"
-            "• Фото: прикрепи фото, в подписи напиши `/broadcast текст`\n"
-            "• GIF: прикрепи гифку, в подписи напиши `/broadcast текст`",
+            "• Текст всем: `/broadcast Ваш текст`\n"
+            "• Фото всем: прикрепи фото, в подписи напиши `/broadcast текст`\n"
+            "• GIF всем: прикрепи гифку, в подписи напиши `/broadcast текст`\n"
+            "• Тест только себе: то же самое, но команда `/broadcasttest`",
             parse_mode="Markdown",
         )
         return
 
-    caption = msg.caption.replace("/broadcast", "").strip() if msg.caption else None
-    status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
+    if is_test:
+        user_ids = [update.effective_user.id]
+    else:
+        user_ids = await db.get_all_user_ids()
+        if not user_ids:
+            await msg.reply_text("Нет пользователей для рассылки.")
+            return
+
+    caption = _broadcast_caption(msg.caption) if msg.caption else None
+    if is_test:
+        status = await msg.reply_text("🧪 Тест: отправляю только вам.")
+    else:
+        status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
 
     sent, failed = 0, 0
     for user_id in user_ids:
@@ -1360,6 +1381,13 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             failed += 1
         await asyncio.sleep(0.05)
+
+    if is_test:
+        if sent:
+            await status.edit_text("✅ Тест отправлен только вам. Остальным ничего не ушло.")
+        else:
+            await status.edit_text("❌ Тест не отправился. Попробуйте ещё раз.")
+        return
 
     await status.edit_text(
         f"✅ Рассылка завершена\n\nОтправлено: {sent}\nНе доставлено: {failed}"
@@ -1757,7 +1785,7 @@ def main():
     app.add_handler(CommandHandler("setaboutphoto", cmd_setaboutphoto))
     app.add_handler(CommandHandler("clearaboutphoto", cmd_clearaboutphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setaboutphoto"), cmd_setaboutphoto))
-    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(CommandHandler(["broadcast", "broadcasttest"], cmd_broadcast))
     app.add_handler(CommandHandler("broadcastevents", cmd_broadcastevents))
     app.add_handler(CommandHandler("eventslink", cmd_eventslink))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
@@ -1776,7 +1804,9 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setcertphoto"), cmd_setcertphoto))
     app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(MessageHandler(
-        (filters.PHOTO | filters.ANIMATION) & filters.CaptionRegex(r"(?i)/broadcast"),
+        (filters.PHOTO | filters.ANIMATION) & filters.CaptionRegex(
+            r"(?i)^/(?:broadcasttest|broadcast)(?:@\w+)?(?:\s|$)"
+        ),
         cmd_broadcast,
     ))
 

@@ -17,7 +17,8 @@
 | `/setcertphoto` | Фото раздела сертификатов (фото + `/setcertphoto`) |
 | `/setaboutphoto` | Фото блока «О RAZMAN production» (фото + `/setaboutphoto`) |
 | `/clearaboutphoto` | Убрать фото из блока «О RAZMAN production» |
-| `/broadcast` | Рассылка: текст, или фото/GIF с подписью `/broadcast …` |
+| `/broadcast` | Рассылка всем: текст, или фото/GIF с подписью `/broadcast …` |
+| `/broadcasttest` | То же самое, но сообщение приходит только вам |
 | `/revokepromo NR-XXXXXXXX` | Отключить промокод **по коду** |
 | `/reissuepromo <telegram_user_id>` или `/reissuepromo NR-XXXXXXXX` | Перевыдать новый активный промокод (старый код перестаёт действовать) |
 | `/userpromo <telegram_user_id>` или `/userpromo NR-XXXXXXXX` | Показать код, статус и user_id (можно искать по коду) |
