@@ -10,6 +10,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    MessageEntity,
     ReplyKeyboardMarkup,
     Update,
     WebAppInfo,
@@ -1315,18 +1316,109 @@ async def cmd_clearaboutphoto(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("✅ Фото раздела «О RAZMAN production» удалено.")
 
 
-_BROADCAST_CMD_RE = re.compile(r"(?i)^/(broadcasttest|broadcast)(?:@\w+)?\s*")
+_BROADCAST_CMD_RE = re.compile(
+    r"(?i)^/(broadcastbuttontest|broadcastbutton|broadcasttest|broadcast)(?:@\w+)?\s*"
+)
+_BROADCAST_TOKEN_RE = re.compile(
+    r"(?i)^/(broadcastbuttontest|broadcastbutton|broadcasttest|broadcast)(?:@\w+)?"
+)
 
 
-def _broadcast_is_test(message) -> bool:
+def _utf16_len(text: str) -> int:
+    """Telegram считает offset сущностей в кодовых единицах UTF-16."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _broadcast_command(message) -> str:
     raw = (message.caption or message.text or "").lstrip()
     match = _BROADCAST_CMD_RE.match(raw)
-    return bool(match and match.group(1).lower() == "broadcasttest")
+    return match.group(1).lower() if match else "broadcast"
 
 
-def _broadcast_caption(caption: str) -> str | None:
-    text = _BROADCAST_CMD_RE.sub("", caption.lstrip(), count=1).strip()
-    return text or None
+def _clone_entity(ent, offset: int, length: int) -> MessageEntity:
+    return MessageEntity(
+        type=ent.type,
+        offset=offset,
+        length=length,
+        url=ent.url,
+        user=ent.user,
+        language=ent.language,
+        custom_emoji_id=getattr(ent, "custom_emoji_id", None),
+    )
+
+
+def _shift_entities(entities, cut: int, body_len: int):
+    """Сдвигает сущности на длину вырезанной команды. Offset — в UTF-16."""
+    if not entities:
+        return None
+    shifted = []
+    for ent in entities:
+        end = ent.offset + ent.length
+        if end <= cut:
+            continue
+        start = max(ent.offset, cut)
+        new_offset = start - cut
+        new_length = end - start
+        if new_offset + new_length > body_len:
+            new_length = body_len - new_offset
+        if new_length <= 0:
+            continue
+        shifted.append(_clone_entity(ent, new_offset, new_length))
+    return shifted or None
+
+
+def _broadcast_body(text: str | None, entities):
+    """Убирает /broadcast в начале и переносит гиперссылки на слова в оставшийся текст."""
+    if not text:
+        return None, None
+    indent = len(text) - len(text.lstrip(" \t"))
+    head = text[indent:]
+    match = _BROADCAST_TOKEN_RE.match(head)
+    if not match:
+        body = text if text.strip() else None
+        if not body:
+            return None, None
+        return body, _shift_entities(entities, 0, _utf16_len(body))
+    space = 1 if head[match.end() :].startswith(" ") else 0
+    prefix_len = indent + match.end() + space
+    body = text[prefix_len:]
+    if not body.strip():
+        return None, None
+    cut = _utf16_len(text[:prefix_len])
+    return body, _shift_entities(entities, cut, _utf16_len(body))
+
+
+_BUTTON_LINE_RE = re.compile(
+    r"(?:\n[ \t]*)*кнопка:[ \t]*(?P<label>.+?)[ \t]*\|[ \t]*(?P<url>(?:https?://|tg://)\S+)[ \t]*\Z",
+    re.IGNORECASE,
+)
+_BUTTON_HINT_RE = re.compile(r"(?i)(?:^|\n)[ \t]*кнопка:[^\n]*\Z")
+_BUTTON_FORMAT = "Кнопка: Текст кнопки | https://адрес"
+
+
+def _extract_broadcast_button(body, entities):
+    """Последняя строка «Кнопка: текст | url» становится кнопкой, из текста она убирается."""
+    if not body or not _BUTTON_HINT_RE.search(body):
+        return body, entities, None, None
+    match = _BUTTON_LINE_RE.search(body)
+    if not match:
+        return body, entities, None, (
+            "Не разобрал кнопку.\n\nПоследней строкой напишите:\n" + _BUTTON_FORMAT
+        )
+    label = match.group("label").strip()
+    url = match.group("url").strip().rstrip(".,);")
+    if not label:
+        return body, entities, None, (
+            "Укажите текст кнопки перед символом |.\n\n" + _BUTTON_FORMAT
+        )
+    if len(label) > 64:
+        return body, entities, None, "Текст кнопки длиннее 64 символов."
+    new_body = body[: match.start()].rstrip()
+    new_entities = (
+        _shift_entities(entities, 0, _utf16_len(new_body)) if new_body else None
+    )
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton(label, url=url)]])
+    return (new_body or None), new_entities, markup, None
 
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1334,20 +1426,51 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = update.message
-    is_test = _broadcast_is_test(msg)
-    text = " ".join(context.args) if context.args else None
+    command = _broadcast_command(msg)
+    is_test = command.endswith("test")
+    needs_button = command.startswith("broadcastbutton")
     has_photo = bool(msg.photo)
     has_animation = bool(msg.animation)
     has_video = bool(msg.video)
+    has_media = has_photo or has_animation or has_video
+    if has_media:
+        text, entities = _broadcast_body(msg.caption, msg.caption_entities)
+    else:
+        text, entities = _broadcast_body(msg.text, msg.entities)
+    text, entities, markup, button_error = _extract_broadcast_button(text, entities)
+    if button_error:
+        await msg.reply_text(button_error)
+        return
+    if needs_button and not markup:
+        await msg.reply_text(
+            "Для кнопки добавьте последней строкой:\n" + _BUTTON_FORMAT
+            + "\n\nТекст сообщения пишите выше этой строки."
+        )
+        return
+    if markup and not needs_button:
+        await msg.reply_text(
+            "Кнопки делаются командой /broadcastbutton (тест — /broadcastbuttontest)."
+        )
+        return
 
-    if not text and not has_photo and not has_animation and not has_video:
+    if not text and not has_media:
+        if markup:
+            await msg.reply_text(
+                "Добавьте текст сообщения над строкой с кнопкой.\n\n" + _BUTTON_FORMAT
+            )
+            return
         await msg.reply_text(
             "Как использовать рассылку:\n\n"
             "• Текст всем: `/broadcast Ваш текст`\n"
             "• Фото всем: прикрепи фото, в подписи напиши `/broadcast текст`\n"
             "• GIF всем: прикрепи гифку, в подписи напиши `/broadcast текст`\n"
             "• Видео всем: прикрепи видео, в подписи напиши `/broadcast текст`\n"
-            "• Тест только себе: то же самое, но команда `/broadcasttest`",
+            "• Ссылка на слово: выделите слово, выберите «Ссылка» и вставьте адрес. "
+            "Так же в подписи к фото, GIF и видео.\n"
+            "• Текст с кнопкой: `/broadcastbutton Ваш текст` и последней строкой\n"
+            f"`{_BUTTON_FORMAT}`\n"
+            "(тест кнопки только себе — `/broadcastbuttontest`)\n"
+            "• Тест только себе: `/broadcasttest`",
             parse_mode="Markdown",
         )
         return
@@ -1360,9 +1483,11 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("Нет пользователей для рассылки.")
             return
 
-    caption = _broadcast_caption(msg.caption) if msg.caption else None
+    caption = text if has_media else None
     if is_test:
-        status = await msg.reply_text("🧪 Тест: отправляю только вам.")
+        status = await msg.reply_text(
+            "🧪 Тест кнопки: отправляю только вам." if markup else "🧪 Тест: отправляю только вам."
+        )
     else:
         status = await msg.reply_text(f"📤 Начинаю рассылку для {len(user_ids)} пользователей...")
 
@@ -1371,18 +1496,35 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             if has_photo:
                 await context.bot.send_photo(
-                    chat_id=user_id, photo=msg.photo[-1].file_id, caption=caption
+                    chat_id=user_id,
+                    photo=msg.photo[-1].file_id,
+                    caption=caption,
+                    caption_entities=entities,
+                    reply_markup=markup,
                 )
             elif has_animation:
                 await context.bot.send_animation(
-                    chat_id=user_id, animation=msg.animation.file_id, caption=caption
+                    chat_id=user_id,
+                    animation=msg.animation.file_id,
+                    caption=caption,
+                    caption_entities=entities,
+                    reply_markup=markup,
                 )
             elif has_video:
                 await context.bot.send_video(
-                    chat_id=user_id, video=msg.video.file_id, caption=caption
+                    chat_id=user_id,
+                    video=msg.video.file_id,
+                    caption=caption,
+                    caption_entities=entities,
+                    reply_markup=markup,
                 )
             else:
-                await context.bot.send_message(chat_id=user_id, text=text)
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=text,
+                    entities=entities,
+                    reply_markup=markup,
+                )
             sent += 1
         except Exception:
             failed += 1
@@ -1390,7 +1532,12 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_test:
         if sent:
-            await status.edit_text("✅ Тест отправлен только вам. Остальным ничего не ушло.")
+            done = (
+                "✅ Тест кнопки отправлен только вам. Остальным ничего не ушло."
+                if markup
+                else "✅ Тест отправлен только вам. Остальным ничего не ушло."
+            )
+            await status.edit_text(done)
         else:
             await status.edit_text("❌ Тест не отправился. Попробуйте ещё раз.")
         return
@@ -1791,7 +1938,10 @@ def main():
     app.add_handler(CommandHandler("setaboutphoto", cmd_setaboutphoto))
     app.add_handler(CommandHandler("clearaboutphoto", cmd_clearaboutphoto))
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setaboutphoto"), cmd_setaboutphoto))
-    app.add_handler(CommandHandler(["broadcast", "broadcasttest"], cmd_broadcast))
+    app.add_handler(CommandHandler(
+        ["broadcast", "broadcasttest", "broadcastbutton", "broadcastbuttontest"],
+        cmd_broadcast,
+    ))
     app.add_handler(CommandHandler("broadcastevents", cmd_broadcastevents))
     app.add_handler(CommandHandler("eventslink", cmd_eventslink))
     app.add_handler(CommandHandler("reviews", cmd_reviews))
@@ -1811,7 +1961,7 @@ def main():
     app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(MessageHandler(
         (filters.PHOTO | filters.ANIMATION | filters.VIDEO) & filters.CaptionRegex(
-            r"(?i)^/(?:broadcasttest|broadcast)(?:@\w+)?(?:\s|$)"
+            r"(?i)^/(?:broadcastbuttontest|broadcastbutton|broadcasttest|broadcast)(?:@\w+)?(?:\s|$)"
         ),
         cmd_broadcast,
     ))
