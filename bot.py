@@ -1338,13 +1338,15 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args) if context.args else None
     has_photo = bool(msg.photo)
     has_animation = bool(msg.animation)
+    has_video = bool(msg.video)
 
-    if not text and not has_photo and not has_animation:
+    if not text and not has_photo and not has_animation and not has_video:
         await msg.reply_text(
             "Как использовать рассылку:\n\n"
             "• Текст всем: `/broadcast Ваш текст`\n"
             "• Фото всем: прикрепи фото, в подписи напиши `/broadcast текст`\n"
             "• GIF всем: прикрепи гифку, в подписи напиши `/broadcast текст`\n"
+            "• Видео всем: прикрепи видео, в подписи напиши `/broadcast текст`\n"
             "• Тест только себе: то же самое, но команда `/broadcasttest`",
             parse_mode="Markdown",
         )
@@ -1374,6 +1376,10 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif has_animation:
                 await context.bot.send_animation(
                     chat_id=user_id, animation=msg.animation.file_id, caption=caption
+                )
+            elif has_video:
+                await context.bot.send_video(
+                    chat_id=user_id, video=msg.video.file_id, caption=caption
                 )
             else:
                 await context.bot.send_message(chat_id=user_id, text=text)
@@ -1804,7 +1810,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO & filters.CaptionRegex(r"(?i)/setcertphoto"), cmd_setcertphoto))
     app.add_handler(MessageHandler(filters.ANIMATION & filters.CaptionRegex(r"(?i)/setgif"), cmd_setgif))
     app.add_handler(MessageHandler(
-        (filters.PHOTO | filters.ANIMATION) & filters.CaptionRegex(
+        (filters.PHOTO | filters.ANIMATION | filters.VIDEO) & filters.CaptionRegex(
             r"(?i)^/(?:broadcasttest|broadcast)(?:@\w+)?(?:\s|$)"
         ),
         cmd_broadcast,
