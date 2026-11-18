@@ -158,11 +158,20 @@ async def init_db():
             created_at TEXT
         )
     """)
+    await _execute("""
+        CREATE TABLE IF NOT EXISTS user_promos_dr (
+            user_id INTEGER PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        )
+    """)
     await assign_missing_giveaway_numbers()
 
 
 _PROMO_ALPHABET = string.ascii_uppercase + string.digits
 _PROMO_CODE_PREFIX = "NR-"
+_DR_PROMO_PREFIX = "DR-"
 _PROMO_CODE_BODY_LEN = 8
 
 
@@ -351,11 +360,156 @@ async def get_promo_by_code(code: str) -> dict | None:
     }
 
 
+def normalize_dr_promo_code(code: str) -> str | None:
+    normalized = code.strip().upper()
+    body = normalized[len(_DR_PROMO_PREFIX):]
+    if (
+        not normalized.startswith(_DR_PROMO_PREFIX)
+        or len(body) != _PROMO_CODE_BODY_LEN
+        or not all(c in _PROMO_ALPHABET for c in body)
+    ):
+        return None
+    return normalized
+
+
+def _dr_promo_row(row: dict) -> dict:
+    av = row["active"]
+    active = bool(int(av)) if av is not None else True
+    return {
+        "user_id": int(row["user_id"]),
+        "code": row["code"],
+        "active": active,
+        "created_at": row["created_at"],
+    }
+
+
+async def _new_unique_dr_promo_code() -> str:
+    for _ in range(64):
+        code = _DR_PROMO_PREFIX + "".join(secrets.choice(_PROMO_ALPHABET) for _ in range(8))
+        result = await _execute("SELECT 1 FROM user_promos_dr WHERE code = ?", [code])
+        if not _rows(result):
+            return code
+    raise RuntimeError("не удалось сгенерировать уникальный промокод Дома Рождества")
+
+
+async def get_user_id_by_dr_promo_code(code: str) -> int | None:
+    normalized = code.strip().upper()
+    if not normalized:
+        return None
+    result = await _execute(
+        "SELECT user_id FROM user_promos_dr WHERE code = ?",
+        [normalized],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    return int(rows[0]["user_id"])
+
+
+async def get_user_dr_promo(user_id: int) -> dict | None:
+    result = await _execute(
+        "SELECT user_id, code, active, created_at FROM user_promos_dr WHERE user_id = ?",
+        [user_id],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    return _dr_promo_row(rows[0])
+
+
+async def issue_user_dr_promo(user_id: int) -> dict:
+    """Один промокод Дома Рождества на пользователя. Отозванный повторно не выдаём."""
+    existing = await get_user_dr_promo(user_id)
+    if existing:
+        return existing
+    phone = await get_phone(user_id)
+    if not phone:
+        raise ValueError("промокод выдаётся только при сохранённом номере телефона")
+    code = await _new_unique_dr_promo_code()
+    now = datetime.now().isoformat(timespec="seconds")
+    await _execute(
+        "INSERT INTO user_promos_dr (user_id, code, active, created_at) VALUES (?, ?, 1, ?)",
+        [user_id, code, now],
+    )
+    row = await get_user_dr_promo(user_id)
+    assert row is not None
+    return row
+
+
+async def deactivate_user_dr_promo(user_id: int) -> bool:
+    if await get_user_dr_promo(user_id) is None:
+        return False
+    await _execute("UPDATE user_promos_dr SET active = 0 WHERE user_id = ?", [user_id])
+    return True
+
+
+async def reissue_user_dr_promo(user_id: int) -> dict:
+    """Новый код DR-*. Старый код удаляется из базы."""
+    if await get_user_dr_promo(user_id) is None:
+        raise ValueError("промокод Дома Рождества ещё не создавался")
+    code = await _new_unique_dr_promo_code()
+    now = datetime.now().isoformat(timespec="seconds")
+    await _execute(
+        "UPDATE user_promos_dr SET code = ?, active = 1, created_at = ? WHERE user_id = ?",
+        [code, now, user_id],
+    )
+    row = await get_user_dr_promo(user_id)
+    assert row is not None
+    return row
+
+
+async def get_dr_promo_by_code(code: str) -> dict | None:
+    normalized = normalize_dr_promo_code(code)
+    if not normalized:
+        return None
+    result = await _execute(
+        "SELECT user_id, code, active, created_at FROM user_promos_dr WHERE code = ?",
+        [normalized],
+    )
+    rows = _rows(result)
+    if not rows:
+        return None
+    return _dr_promo_row(rows[0])
+
+
+async def redeem_dr_promo_code(code: str, *, discount_percent: int) -> dict:
+    """Одноразово погасить промокод DR-* из базы бота."""
+    normalized = normalize_dr_promo_code(code)
+    if not normalized:
+        raise PromoRedeemError("invalid_format")
+
+    existing = await get_dr_promo_by_code(normalized)
+    if existing is None:
+        raise PromoRedeemError("not_found")
+    if not existing["active"]:
+        raise PromoRedeemError("already_used")
+    if not is_promo_still_valid(existing.get("created_at")):
+        raise PromoRedeemError("expired")
+
+    result = await _execute(
+        "UPDATE user_promos_dr SET active = 0 WHERE code = ? AND active = 1 "
+        "RETURNING user_id, code",
+        [normalized],
+    )
+    rows = _rows(result)
+    if rows:
+        return {
+            "user_id": int(rows[0]["user_id"]),
+            "code": rows[0]["code"],
+            "discount_percent": discount_percent,
+        }
+
+    raise PromoRedeemError("already_used")
+
+
 async def redeem_promo_code(code: str, *, discount_percent: int) -> dict:
     """
-    Одноразово погасить промокод NR-* из базы бота.
+    Одноразово погасить промокод NR-* или DR-* из базы бота.
     Возвращает user_id, code, discount_percent.
     """
+    if code.strip().upper().startswith(_DR_PROMO_PREFIX):
+        return await redeem_dr_promo_code(code, discount_percent=discount_percent)
+
     normalized = normalize_promo_code(code)
     if not normalized:
         raise PromoRedeemError("invalid_format")

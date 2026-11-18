@@ -1,4 +1,4 @@
-"""HTTP API погашения промокодов NR-* (POST /api/promo/redeem)."""
+"""HTTP API погашения промокодов NR-* и DR-* (POST /api/promo/redeem)."""
 
 from __future__ import annotations
 
