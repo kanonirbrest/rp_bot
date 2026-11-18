@@ -21,6 +21,6 @@
 | `/broadcastbutton` | То же, но с кнопкой: последняя строка `Кнопка: текст \| https://адрес` |
 | `/broadcastbuttontest` | Тест `/broadcastbutton`: только администратору |
 | `/broadcasttest` | То же самое, но сообщение приходит только вам |
-| `/revokepromo NR-XXXXXXXX` | Отключить промокод **по коду** |
-| `/reissuepromo <telegram_user_id>` или `/reissuepromo NR-XXXXXXXX` | Перевыдать новый активный промокод (старый код перестаёт действовать) |
-| `/userpromo <telegram_user_id>` или `/userpromo NR-XXXXXXXX` | Показать код, статус и user_id (можно искать по коду) |
+| `/revokepromo DR-XXXXXXXX` | Отключить промокод «Дома Рождества» **по коду** |
+| `/reissuepromo <telegram_user_id>` или `/reissuepromo DR-XXXXXXXX` | Перевыдать новый активный промокод «Дома Рождества» (старый код перестаёт действовать) |
+| `/userpromo <telegram_user_id>` или `/userpromo DR-XXXXXXXX` | Показать код «Дома Рождества», статус и user_id (можно искать по коду или телефону) |

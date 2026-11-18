@@ -207,6 +207,20 @@ def is_promo_still_valid(created_at: str | None) -> bool:
     return today <= promo_valid_until_date(created_at)
 
 
+# «Дом Рождества»: один срок на всю акцию, не «месяц с даты выдачи».
+DR_PROMO_VALID_UNTIL = date(2027, 1, 17)
+
+
+def is_dr_promo_still_valid() -> bool:
+    today = datetime.now(_PROMO_TZ).date()
+    return today <= DR_PROMO_VALID_UNTIL
+
+
+def format_dr_promo_valid_until() -> str:
+    v = DR_PROMO_VALID_UNTIL
+    return f"{v.day:02d}.{v.month:02d}.{v.year}"
+
+
 def normalize_promo_code(code: str) -> str | None:
     normalized = code.strip().upper()
     body = normalized[len(_PROMO_CODE_PREFIX):]
@@ -483,7 +497,7 @@ async def redeem_dr_promo_code(code: str, *, discount_percent: int) -> dict:
         raise PromoRedeemError("not_found")
     if not existing["active"]:
         raise PromoRedeemError("already_used")
-    if not is_promo_still_valid(existing.get("created_at")):
+    if not is_dr_promo_still_valid():
         raise PromoRedeemError("expired")
 
     result = await _execute(

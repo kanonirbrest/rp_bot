@@ -4,8 +4,6 @@ import io
 import logging
 import os
 import re
-from datetime import datetime
-
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -92,15 +90,7 @@ PROJECTS = [
     "Дом Рождества 1.0",
 ]
 
-# Единый текст выдачи промокода (10%, срок — дата выдачи + 1 календарный месяц).
-
-
-def gift_promo_revoked_by_admin_user_message() -> str:
-    return (
-        "Промокод по этой акции для вашего аккаунта был отменён администратором. "
-        "Повторно получить промокод по этой акции нельзя.\n\n"
-        f"По вопросам: касса DEI или {PHONE}"
-    )
+# Персональный промокод клуба — только «Дом Рождества» (DR-*, 10%).
 
 
 ZONE_NAMES = {
@@ -136,32 +126,14 @@ def bottom_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def _promo_valid_until_label(created_at: str | None) -> str:
-    if created_at:
-        return db.format_promo_valid_until(created_at)
-    return db.format_promo_valid_until(datetime.now().isoformat(timespec="seconds"))
-
-
-def format_user_promo_message(code: str, created_at: str | None = None) -> str:
+def format_dr_promo_message(code: str) -> str:
     c = html.escape(code)
-    valid_until = _promo_valid_until_label(created_at)
+    valid_until = db.format_dr_promo_valid_until()
     return (
-        "Твой персональный промокод на скидку 10% на иммерсивную медиа-выставку "
-        f"«Небо.Река» — <code>{c}</code>\n\n"
-        "Как использовать: при покупке билетов онлайн на сайте dei.by нужно ввести "
-        "промокод в соответствующее окно👌🏻\n\n"
-        f"*промокод действует по {valid_until}"
-    )
-
-
-def format_dr_promo_message(code: str, created_at: str | None = None) -> str:
-    c = html.escape(code)
-    valid_until = _promo_valid_until_label(created_at)
-    return (
-        "Твой персональный промокод на скидку 10% на «Дом Рождества» — "
-        f"<code>{c}</code>\n\n"
-        "Как использовать: при покупке билетов онлайн на сайте dei.by нужно ввести "
-        "промокод в соответствующее окно👌🏻\n\n"
+        "Твой персональный промокод на скидку 10% на интерактивное пространство "
+        f"«Дом Рождества» — <code>{c}</code>\n\n"
+        "Как воспользоваться промокодом: при покупке билетов онлайн на нашем сайте "
+        "domrp.by, необходимо ввести данный промокод в соответствующее окно👌🏻\n\n"
         f"*промокод действует по {valid_until}"
     )
 
@@ -258,18 +230,6 @@ async def _check_phone_gate(
             "с подтверждённым номером телефона.\n\n"
             "Поделись номером телефона, чтобы продолжить:"
         )
-    elif phone_stage.startswith("gift_promo"):
-        intro = (
-            "🎁 Персональная скидка в разделе «Специальные предложения» доступна участникам клуба "
-            "с подтверждённым номером.\n\n"
-            "Поделись номером телефона, чтобы продолжить:"
-        )
-    elif phone_stage.startswith("offers_promo"):
-        intro = (
-            "🎟 Персональная скидка и индивидуальный промокод доступны участникам клуба "
-            "с подтверждённым номером телефона.\n\n"
-            "Поделись номером телефона, чтобы продолжить:"
-        )
     else:
         intro = (
             "💝 Специальные предложения доступны только для участников клуба.\n\n"
@@ -311,10 +271,9 @@ def _offers_hub_text() -> str:
 def _offers_nav_keyboard(
     active: str | None,
     *,
-    include_generate: bool = False,
     include_generate_dr: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Вкладки спецпредложений в столбик. active: None | 'general' | 'promo' | 'dr'."""
+    """Вкладки спецпредложений в столбик. active: None | 'general' | 'dr'."""
     rows = [
         [
             InlineKeyboardButton(
@@ -324,24 +283,11 @@ def _offers_nav_keyboard(
         ],
         [
             InlineKeyboardButton(
-                "🎟 Персональная скидка" + (" ✓" if active == "promo" else ""),
-                callback_data="cb_offers_promo",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
                 "🎄 Дом Рождества" + (" ✓" if active == "dr" else ""),
                 callback_data="cb_offers_dr",
             ),
         ],
     ]
-    if include_generate:
-        rows.append([
-            InlineKeyboardButton(
-                "Сгенерировать индивидуальный промокод",
-                callback_data="cb_gen_gift_promo",
-            ),
-        ])
     if include_generate_dr:
         rows.append([
             InlineKeyboardButton(
@@ -355,7 +301,8 @@ def _offers_nav_keyboard(
 async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, InlineKeyboardMarkup]:
     """
     Собирает текст и клавиатуру вкладки спецпредложений.
-    tab: 'auto' — общий экран-приветствие; 'general' | 'promo' | 'dr' — явный выбор.
+    tab: 'auto' — общий экран-приветствие; 'general' | 'dr' — явный выбор.
+    Старые кнопки вкладки «Персональная скидка» открывают «Дом Рождества».
     """
     if tab == "auto":
         return _offers_hub_text(), None, _offers_nav_keyboard(None)
@@ -363,57 +310,28 @@ async def _build_offers_tab(user_id: int, tab: str) -> tuple[str, str | None, In
     if tab == "general":
         return _offers_discounts_text(), None, _offers_nav_keyboard("general")
 
-    if tab == "dr":
-        row = await db.get_user_dr_promo(user_id)
-        if row and row["active"]:
-            return (
-                format_dr_promo_message(row["code"], row.get("created_at")),
-                "HTML",
-                _offers_nav_keyboard("dr"),
-            )
-        if row and not row["active"]:
-            return (
-                dr_promo_revoked_by_admin_user_message(),
-                None,
-                _offers_nav_keyboard("dr"),
-            )
-        return (
-            (
-                "🎄 Дом Рождества\n\n"
-                "Скидка 10% на «Дом Рождества». "
-                "Нажми кнопку ниже, чтобы получить индивидуальный промокод "
-                "(для участников клуба с подтверждённым номером телефона)."
-            ),
-            None,
-            _offers_nav_keyboard("dr", include_generate_dr=True),
-        )
-
-    # вкладка «Персональная скидка»
-    row = await db.get_user_promo(user_id)
-
+    row = await db.get_user_dr_promo(user_id)
     if row and row["active"]:
         return (
-            format_user_promo_message(row["code"], row.get("created_at")),
+            format_dr_promo_message(row["code"]),
             "HTML",
-            _offers_nav_keyboard("promo"),
+            _offers_nav_keyboard("dr"),
         )
-
     if row and not row["active"]:
         return (
-            gift_promo_revoked_by_admin_user_message(),
+            dr_promo_revoked_by_admin_user_message(),
             None,
-            _offers_nav_keyboard("promo"),
+            _offers_nav_keyboard("dr"),
         )
-
     return (
         (
-            "🎟 Персональная скидка\n\n"
-            "Скидка 10% на иммерсивную медиа-выставку «Небо.Река». "
+            "🎄 Дом Рождества\n\n"
+            "Скидка 10% на интерактивное пространство «Дом Рождества». "
             "Нажми кнопку ниже, чтобы получить индивидуальный промокод "
             "(для участников клуба с подтверждённым номером телефона)."
         ),
         None,
-        _offers_nav_keyboard("promo", include_generate=True),
+        _offers_nav_keyboard("dr", include_generate_dr=True),
     )
 
 
@@ -610,19 +528,13 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=bottom_keyboard(),
     )
 
-    if stage == "offers_promo_1":
-        uid = user.id
-        text, parse_mode, kb = await _build_offers_tab(uid, "promo")
-        await update.message.reply_text(text, reply_markup=kb, parse_mode=parse_mode)
-        return
-
-    if stage == "offers_dr_1":
+    if stage in ("offers_dr_1", "offers_promo_1"):
         uid = user.id
         text, parse_mode, kb = await _build_offers_tab(uid, "dr")
         await update.message.reply_text(text, reply_markup=kb, parse_mode=parse_mode)
         return
 
-    if stage == "gift_dr_1":
+    if stage in ("gift_dr_1", "gift_promo_1"):
         existing = await db.get_user_dr_promo(user.id)
         if existing and not existing["active"]:
             await update.message.reply_text(dr_promo_revoked_by_admin_user_message())
@@ -640,30 +552,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(dr_promo_revoked_by_admin_user_message())
         else:
             await update.message.reply_text(
-                format_dr_promo_message(row["code"], row.get("created_at")),
-                parse_mode="HTML",
-            )
-        return
-
-    if stage == "gift_promo_1":
-        existing = await db.get_user_promo(user.id)
-        if existing and not existing["active"]:
-            await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
-            return
-        try:
-            row = await db.issue_user_promo(user.id)
-        except ValueError:
-            logger.warning("issue_user_promo declined: no phone for user %s", user.id)
-            await update.message.reply_text(
-                "Индивидуальный промокод доступен только после сохранения номера телефона "
-                "в профиле клуба.",
-            )
-            return
-        if not row["active"]:
-            await update.message.reply_text(gift_promo_revoked_by_admin_user_message())
-        else:
-            await update.message.reply_text(
-                format_user_promo_message(row["code"], row.get("created_at")),
+                format_dr_promo_message(row["code"]),
                 parse_mode="HTML",
             )
         return
@@ -693,16 +582,7 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if stage == "offers_promo_1":
-        context.user_data["phone_stage"] = "offers_promo_2"
-        await update.message.reply_text(
-            "Без номера персональная скидка и промокод недоступны.\n\n"
-            "Поделишься контактом?",
-            reply_markup=_phone_request_keyboard(is_retry=True),
-        )
-        return
-
-    if stage == "offers_dr_1":
+    if stage in ("offers_dr_1", "offers_promo_1"):
         context.user_data["phone_stage"] = "offers_dr_2"
         await update.message.reply_text(
             "Без номера скидка на «Дом Рождества» и промокод недоступны.\n\n"
@@ -711,19 +591,10 @@ async def handle_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if stage == "gift_dr_1":
+    if stage in ("gift_dr_1", "gift_promo_1"):
         context.user_data["phone_stage"] = "gift_dr_2"
         await update.message.reply_text(
             "Без номера индивидуальный промокод на «Дом Рождества» недоступен.\n\n"
-            "Поделишься контактом?",
-            reply_markup=_phone_request_keyboard(is_retry=True),
-        )
-        return
-
-    if stage == "gift_promo_1":
-        context.user_data["phone_stage"] = "gift_promo_2"
-        await update.message.reply_text(
-            "Без номера индивидуальный промокод недоступен.\n\n"
             "Поделишься контактом?",
             reply_markup=_phone_request_keyboard(is_retry=True),
         )
@@ -740,17 +611,9 @@ async def handle_final_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки «Нет, не хочу» — финальный отказ от номера."""
     stage = context.user_data.pop("phone_stage", "")
 
-    if "offers_dr" in stage or "gift_dr" in stage:
+    if "offers_dr" in stage or "gift_dr" in stage or "offers_promo" in stage or "gift_promo" in stage:
         await update.message.reply_text(
             "Промокод на «Дом Рождества» доступен только "
-            "с подтверждённым номером телефона.",
-            reply_markup=bottom_keyboard(),
-        )
-        return
-
-    if "offers_promo" in stage:
-        await update.message.reply_text(
-            "Персональная скидка и индивидуальный промокод доступны только "
             "с подтверждённым номером телефона.",
             reply_markup=bottom_keyboard(),
         )
@@ -760,13 +623,6 @@ async def handle_final_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Раздел специальных предложений доступен только для участников клуба "
             "с подтверждённым номером телефона.",
-            reply_markup=bottom_keyboard(),
-        )
-        return
-
-    if "gift_promo" in stage:
-        await update.message.reply_text(
-            "Индивидуальный промокод доступен только с подтверждённым номером телефона.",
             reply_markup=bottom_keyboard(),
         )
         return
@@ -1016,16 +872,6 @@ async def cb_offers_general(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
 
 
-async def cb_offers_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await _safe_answer_callback(query)
-    if not await _check_phone_gate(update, context, phone_stage="offers_promo_1"):
-        return
-    uid = update.effective_user.id
-    text, parse_mode, kb = await _build_offers_tab(uid, "promo")
-    await _safe_edit_offers_message(query, text, parse_mode=parse_mode, reply_markup=kb)
-
-
 async def cb_offers_dr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await _safe_answer_callback(query)
@@ -1066,36 +912,6 @@ async def cb_certificates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_certificates(query.message)
 
 
-async def cb_gen_gift_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await _safe_answer_callback(query)
-    user = update.effective_user
-    existing = await db.get_user_promo(user.id)
-    if existing and not existing["active"]:
-        await query.message.reply_text(gift_promo_revoked_by_admin_user_message())
-        return
-    if not await _check_phone_gate(update, context, phone_stage="gift_promo_1"):
-        return
-    try:
-        row = await db.issue_user_promo(user.id)
-    except ValueError:
-        logger.warning("issue_user_promo declined: no phone for user %s", user.id)
-        await query.message.reply_text(
-            "Индивидуальный промокод доступен только после сохранения номера телефона "
-            "в профиле клуба.",
-        )
-        return
-    if not row["active"]:
-        await query.message.reply_text(gift_promo_revoked_by_admin_user_message())
-        return
-    await _safe_edit_offers_message(
-        query,
-        format_user_promo_message(row["code"], row.get("created_at")),
-        parse_mode="HTML",
-        reply_markup=_offers_nav_keyboard("promo"),
-    )
-
-
 async def cb_gen_dr_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await _safe_answer_callback(query)
@@ -1120,7 +936,7 @@ async def cb_gen_dr_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await _safe_edit_offers_message(
         query,
-        format_dr_promo_message(row["code"], row.get("created_at")),
+        format_dr_promo_message(row["code"]),
         parse_mode="HTML",
         reply_markup=_offers_nav_keyboard("dr"),
     )
@@ -1851,13 +1667,11 @@ async def _resolve_promo_user_id(raw: str) -> tuple[int | None, str]:
 
 
 def _promo_lookup_not_found_message(kind: str) -> str:
-    if kind == "promo_dr":
+    if kind in ("promo_dr", "promo"):
         return "Промокод не найден в базе. Проверьте написание (формат DR-XXXXXXXX)."
-    if kind == "promo":
-        return "Промокод не найден в базе. Проверьте написание (формат NR-XXXXXXXX)."
     if kind == "phone":
         return "Пользователь с таким номером не найден. Номер должен быть в базе (Telegram-контакт)."
-    return "Укажите telegram_user_id, NR-XXXXXXXX, DR-XXXXXXXX или номер телефона (+375…)."
+    return "Укажите telegram_user_id, DR-XXXXXXXX или номер телефона (+375…)."
 
 
 async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1868,25 +1682,32 @@ async def cmd_revokepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not context.args:
         await msg.reply_text(
-            "Использование: /revokepromo NR-XXXXXXXX или /revokepromo DR-XXXXXXXX\n\n"
-            "Отключает промокод только по коду (как у пользователя в сообщении). "
-            "Код «Дома Рождества» не отключает промокод «Небо.Реки» и наоборот."
+            "Использование: /revokepromo DR-XXXXXXXX\n\n"
+            "Отключает промокод «Дома Рождества» только по коду "
+            "(как у пользователя в сообщении)."
         )
         return
     raw = context.args[0].strip()
-    dr = raw.upper().startswith("DR-")
-    uid = (
-        await db.get_user_id_by_dr_promo_code(raw)
-        if dr
-        else await db.get_user_id_by_promo_code(raw)
-    )
-    if uid is None:
-        await msg.reply_text(
-            "Промокод не найден в базе. Проверьте написание "
-            "(формат NR-XXXXXXXX или DR-XXXXXXXX)."
-        )
+    upper = raw.upper()
+    if upper.startswith("NR-"):
+        uid = await db.get_user_id_by_promo_code(raw)
+        if uid is None:
+            await msg.reply_text(
+                "Промокод не найден в базе. Акция «Небо.Река» больше не выдаётся."
+            )
+            return
+        ok = await db.deactivate_user_promo(uid)
+    elif upper.startswith("DR-"):
+        uid = await db.get_user_id_by_dr_promo_code(raw)
+        if uid is None:
+            await msg.reply_text(
+                "Промокод не найден в базе. Проверьте написание (формат DR-XXXXXXXX)."
+            )
+            return
+        ok = await db.deactivate_user_dr_promo(uid)
+    else:
+        await msg.reply_text("Укажите код формата DR-XXXXXXXX.")
         return
-    ok = await db.deactivate_user_dr_promo(uid) if dr else await db.deactivate_user_promo(uid)
     code_disp = html.escape(raw.strip().upper())
     if ok:
         await msg.reply_text(
@@ -1909,27 +1730,29 @@ async def cmd_reissuepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             "Использование:\n"
             "/reissuepromo <telegram_user_id>\n"
-            "/reissuepromo NR-XXXXXXXX\n"
             "/reissuepromo DR-XXXXXXXX\n"
             "/reissuepromo +375XXXXXXXXX\n\n"
-            "Выдаёт новый активный промокод. Старый код перестаёт действовать.\n"
-            "По id или телефону перевыпускается код «Небо.Реки». "
-            "Код «Дома Рождества» перевыпускается только по DR-XXXXXXXX."
+            "Выдаёт новый активный промокод «Дома Рождества». Старый код перестаёт действовать."
         )
         return
     raw = " ".join(context.args).strip()
     uid, kind = await _resolve_promo_user_id(raw)
+    if kind == "promo":
+        await msg.reply_text(
+            "Промокоды «Небо.Река» больше не выдаются. "
+            "Чтобы перевыпустить код «Дома Рождества», укажите telegram_user_id, "
+            "телефон или DR-XXXXXXXX."
+        )
+        return
     if uid is None:
         await msg.reply_text(_promo_lookup_not_found_message(kind))
         return
-    dr = kind == "promo_dr"
-    old = await db.get_user_dr_promo(uid) if dr else await db.get_user_promo(uid)
+    old = await db.get_user_dr_promo(uid)
     if not old:
-        label = "Дома Рождества" if dr else "Небо.Реки"
-        await msg.reply_text(f"У пользователя {uid} промокод «{label}» ещё не создавался.")
+        await msg.reply_text(f"У пользователя {uid} промокод «Дома Рождества» ещё не создавался.")
         return
     try:
-        row = await db.reissue_user_dr_promo(uid) if dr else await db.reissue_user_promo(uid)
+        row = await db.reissue_user_dr_promo(uid)
     except ValueError as e:
         await msg.reply_text(str(e))
         return
@@ -1953,11 +1776,9 @@ async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             "Использование:\n"
             "/userpromo <telegram_user_id>\n"
-            "/userpromo NR-XXXXXXXX\n"
             "/userpromo DR-XXXXXXXX\n"
             "/userpromo +375XXXXXXXXX\n\n"
-            "По id или телефону показываются оба промокода. "
-            "По коду — только эта акция."
+            "Показывает промокод «Дома Рождества»: код, статус и user_id."
         )
         return
     raw = " ".join(context.args).strip()
@@ -1967,17 +1788,12 @@ async def cmd_userpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     phone = await db.get_phone(uid)
     phone_line = f"Телефон: <code>{html.escape(phone)}</code>\n" if phone else ""
-    if kind == "promo_dr":
-        rows = [("Дом Рождества", await db.get_user_dr_promo(uid))]
-    elif kind == "promo":
-        rows = [("Небо.Река", await db.get_user_promo(uid))]
+    if kind == "promo":
+        rows = [("Небо.Река (больше не выдаётся)", await db.get_user_promo(uid))]
     else:
-        rows = [
-            ("Небо.Река", await db.get_user_promo(uid)),
-            ("Дом Рождества", await db.get_user_dr_promo(uid)),
-        ]
+        rows = [("Дом Рождества", await db.get_user_dr_promo(uid))]
     if all(row is None for _, row in rows):
-        await msg.reply_text(f"У пользователя {uid} промокоды ещё не создавались.")
+        await msg.reply_text(f"У пользователя {uid} промокод «Дома Рождества» ещё не создавался.")
         return
     lines = [f"Пользователь <code>{uid}</code>", phone_line.rstrip()]
     for title, row in rows:
@@ -2170,15 +1986,13 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_exhibition,  pattern="^cb_exhibition$"))
     app.add_handler(CallbackQueryHandler(cb_offers,      pattern="^cb_offers$"))
     app.add_handler(CallbackQueryHandler(cb_offers_general, pattern="^cb_offers_general$"))
-    app.add_handler(CallbackQueryHandler(cb_offers_promo, pattern="^cb_offers_promo$"))
-    app.add_handler(CallbackQueryHandler(cb_offers_dr, pattern="^cb_offers_dr$"))
+    app.add_handler(CallbackQueryHandler(cb_offers_dr, pattern="^cb_offers_(?:promo|dr)$"))
     app.add_handler(CallbackQueryHandler(cb_events, pattern="^cb_events$"))
     app.add_handler(CallbackQueryHandler(cb_event_sady, pattern="^cb_event_sady$"))
     app.add_handler(CallbackQueryHandler(cb_event_aksyutik, pattern="^cb_event_aksyutik$"))
     app.add_handler(CallbackQueryHandler(cb_announcements, pattern="^cb_announcements$"))
     app.add_handler(CallbackQueryHandler(cb_certificates, pattern="^cb_certificates$"))
-    app.add_handler(CallbackQueryHandler(cb_gen_gift_promo, pattern="^cb_gen_gift_promo$"))
-    app.add_handler(CallbackQueryHandler(cb_gen_dr_promo, pattern="^cb_gen_dr_promo$"))
+    app.add_handler(CallbackQueryHandler(cb_gen_dr_promo, pattern="^cb_gen_(?:gift|dr)_promo$"))
     app.add_handler(CallbackQueryHandler(cb_faq,         pattern="^cb_faq$"))
     app.add_handler(CallbackQueryHandler(cb_faq_item,    pattern="^faq_"))
     app.add_handler(CallbackQueryHandler(cb_giveaway,    pattern="^cb_giveaway$"))
