@@ -984,7 +984,7 @@ FAQ_ANSWERS = {
 }
 
 FAQ_WITH_PHONE = {"faq_return", "faq_cantbuy"}
-FAQ_WITH_TICKET_BUTTON = {"faq_cantbuy"}
+FAQ_WITH_TG_BUTTON = {"faq_cantbuy"}
 
 
 FAQ_LIST_TEXT = "❓ Часто задаваемые вопросы\n\nВыбери вопрос:"
@@ -993,7 +993,7 @@ FAQ_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("Где и как купить билет 🎟",     callback_data="faq_buy")],
     [InlineKeyboardButton("Вернуть / обменять билет 🔄",  callback_data="faq_return")],
     [InlineKeyboardButton("Билеты не пришли на почту 📧", callback_data="faq_notreceived")],
-    [InlineKeyboardButton("Не могу купить билет ❌",      url=TICKET_URL)],
+    [InlineKeyboardButton("Не могу купить билет ❌",      callback_data="faq_cantbuy")],
     [InlineKeyboardButton("Нужно ли печатать билет? 🖨",  callback_data="faq_print")],
 ])
 
@@ -1017,9 +1017,9 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     buttons = [
         [InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")],
     ]
-    if key in FAQ_WITH_TICKET_BUTTON:
+    if key in FAQ_WITH_TG_BUTTON:
         buttons.insert(0, [
-            InlineKeyboardButton("✈️ Написать в ТГ", url=TICKET_URL),
+            InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}"),
         ])
     try:
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
