@@ -50,10 +50,7 @@ RE_MENU_REVIEW  = r".*(Оставить отзыв).*"
 SELECT_PROJECT, RATE_PROJECT, ENTER_EMAIL, ENTER_TEXT = range(4)
 
 # ── Constants ──────────────────────────────────────────────────────
-TICKET_URL   = (
-    "https://dei-tickets.onrender.com/buy-tickets-smr"
-    "?utm_source=tg&utm_medium=banner&utm_campaign=knopka_vistavka"
-)
+TICKET_URL   = "https://domrp.by/?utm_source=tgknopka"
 ABOUT_URL    = "https://dei.by/about"
 YANDEX_URL   = "https://yandex.ru/navi/org/dom_eksperimentalnogo_iskusstva/194412181469?si=g47c3yvm4mfkntjk53aud05zg8"
 PHONE        = "+375447383333"
@@ -61,7 +58,7 @@ TG_USERNAME  = "DEI_by_RP"
 # Интерактивная карта (картинка, клики, полные тексты зон) — в репозитории GitHub Pages по этому URL.
 MAP_BASE_URL = "https://kanonirbrest.github.io/rp_bot/"
 WELCOME_PHOTO_URL = f"{MAP_BASE_URL}welcome-team.png"
-EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-nebo-reka-v2.png"
+EXHIBITION_PHOTO_URL = f"{MAP_BASE_URL}exhibition-dom-rozhdestva.jpg"
 EVENT_SADY_PHOTO_URL = f"{MAP_BASE_URL}event-sady-snovideniy-v2.png"
 EVENT_SADY_INFO_URL = (
     "https://dei.by/sady_snovideniy"
@@ -82,12 +79,9 @@ BROADCAST_EVENTS_TEXT = (
 )
 
 PROJECTS = [
-    "Небо.Река 2026",
-    "Дом Рождества 3.0",
+    "Дом Рождества",
+    "Небо Река",
     "Путь.Напряжение",
-    "Небо.Река 2025",
-    "Дом Рождества 2.0",
-    "Дом Рождества 1.0",
 ]
 
 # Персональный промокод клуба — только «Дом Рождества» (DR-*, 10%).
@@ -155,11 +149,9 @@ def events_hub_inline() -> InlineKeyboardMarkup:
 
 def main_menu_inline() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('Выставка "Небо.Река" 🎨',        callback_data="cb_exhibition")],
-        [InlineKeyboardButton("Карта выставки 🗺",               web_app=WebAppInfo(url=MAP_BASE_URL))],
+        [InlineKeyboardButton('Выставки "Дом Рождества"',        callback_data="cb_exhibition")],
         [InlineKeyboardButton("Предстоящие события 📅",          callback_data="cb_events")],
         [InlineKeyboardButton("Специальные предложения 💝",      callback_data="cb_offers")],
-        [InlineKeyboardButton("Подарочные сертификаты 🎁",       callback_data="cb_certificates")],
         [InlineKeyboardButton("Часто задаваемые вопросы ❓",     callback_data="cb_faq")],
         [InlineKeyboardButton("Связаться с нами 📞",             callback_data="cb_contact")],
         [InlineKeyboardButton("Оставить отзыв ⭐",               callback_data="review_start")],
@@ -655,13 +647,12 @@ async def handle_contact_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ── Section senders (reused by inline callbacks and slash commands) ─
 async def _send_exhibition(message):
     text = (
-        "«НЕБО.РЕКА» Планета после шума — иммерсивная медиа-выставка "
-        "и один из самых масштабных арт-проектов страны.\n\n"
-        "Команда Razman Production создала на площади 2300 м² в окружении 500 тонн воды "
-        "уникальный мир, где природа вдохновляет, технологии удивляют, живая музыка трогает.\n\n"
-        "«Небо.Река» выключает городскую «громкость» и возвращает чувствительность — "
-        "даёт возможность остановиться, выдохнуть и прожить редкий опыт присутствия «здесь и сейчас».\n\n"
-        "📅 21 марта — 08 ноября\n"
+        "«ДОМ РОЖДЕСТВА» — интерактивное пространство полного погружения "
+        "в новогоднюю атмосферу.\n\n"
+        "На площади 2300 м² вас ждут более 30 интерактивных зон, Фабрика чудес "
+        "и Волшебный лес. Здесь недостаточно смотреть — нужно действовать: "
+        "запустить механизм, загадать мечту, написать письмо и помочь чуду случиться.\n\n"
+        "📅 09 декабря — 17 января\n"
         "📍 DEI (Дом Экспериментального Искусства)\n"
         "Минск, пр-т. Машерова 15/1\n\n"
         "Подробности и билеты на сайте:"
@@ -669,8 +660,12 @@ async def _send_exhibition(message):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟 Купить билет", url=TICKET_URL)],
     ])
-    photo = await _event_photo("exhibition_photo_v2", EXHIBITION_PHOTO_URL)
-    await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+    photo = await _event_photo("exhibition_photo_dr", EXHIBITION_PHOTO_URL)
+    try:
+        await message.reply_photo(photo=photo, caption=text, reply_markup=kb)
+    except BadRequest as e:
+        logger.warning("exhibition photo not sent, fallback to text: %s", e)
+        await message.reply_text(text, reply_markup=kb)
 
 
 EVENT_SADY_TEXT = (
@@ -725,8 +720,11 @@ async def _event_photo(setting_key: str, fallback_url: str) -> str:
 
 
 async def _send_events_hub(message):
-    text = "Предстоящие события 📅\n\nВыбери событие:"
-    await message.reply_text(text, reply_markup=events_hub_inline())
+    text = (
+        "Следите за обновлениями! Совсем скоро здесь появятся крутые мероприятия, "
+        "которые точно нужно посетить!"
+    )
+    await message.reply_text(text)
 
 
 async def _send_event_sady(message):
@@ -946,27 +944,28 @@ async def cb_gen_dr_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 FAQ_ANSWERS = {
     "faq_buy": (
         "Где и как купить билет 🎟\n\n"
-        "Есть три варианта покупки билетов:\n"
-        "• на сайте dei.by\n"
-        "• в кассе билетного оператора Ticketpro\n"
-        "• в кассе перед посещением\n\n"
-        "Обращаем внимание, что количество проданных билетов в час ограничено, "
-        "поэтому может возникнуть ситуация, что придётся ожидать на входе.\n\n"
-        "Рекомендуем приобретать билеты заранее на конкретную дату и время 🤍"
+        "Рекомендуем приобретать билет заранее на нашем сайте domrp.by "
+        "на конкретную дату и время 🤍\n\n"
+        "Обращаем внимание, что количество билетов ограничено"
     ),
     "faq_return": (
         "Вернуть / обменять билет 🔄\n\n"
-        "Возврат билетов осуществляется в кассе по адресу:\n"
-        "Минск, пр. Машерова, 15/1 (вход со двора).\n\n"
-        "Возврат возможен не менее чем за 24 часа до начала сеанса.\n\n"
-        "Если вы хотите перенести ваш визит, просим связаться с оператором:"
+        "Согласно Кодекса Республики Беларусь «О культуре» №413-З от 20.07.2016г. "
+        "входные билеты на культурно-зрелищные мероприятия могут быть возвращены "
+        "по инициативе гражданина не позднее, чем за 1 (один) день до дня проведения мероприятия.\n\n"
+        "Для оформления возврата билетов, которые были приобретены на нашем сайте "
+        "domrp.by необходимо обратиться на эл.почту: bilet@domrp.by указав следующую информацию:\n"
+        "-эл.чек покупки билета(ов)\n"
+        "-эл.почта, на которую приобретался билет\n\n"
+        "При возврате билетов, приобретённых по промокодам, промокод не восстанавливается "
+        "и последующая продажа билета по нему невозможна."
     ),
     "faq_notreceived": (
         "Билеты не пришли на почту 📧\n\n"
-        "Билеты после оплаты приходят в течение часа.\n\n"
-        "Если прошло больше часа — проверьте папку «Спам» в почтовом ящике.\n\n"
-        "Если это не помогло, обратитесь в службу поддержки билетного оператора, "
-        "у которого вы приобретали билет."
+        "Билеты после оплаты приходят на указанную вами эл.почту в течение часа.\n\n"
+        "Если прошло более часа, пожалуйста, проверьте папку «Спам» в вашем эл.почтовом ящике.\n\n"
+        "Если это не решило ситуацию, пожалуйста, обратитесь в нашу службу поддержки "
+        "по номеру: +375 (44) 738 33 33"
     ),
     "faq_gift": (
         "Купить билет в подарок 🎁\n\n"
@@ -992,7 +991,8 @@ FAQ_ANSWERS = {
     ),
 }
 
-FAQ_WITH_CONTACT = {"faq_return", "faq_cantbuy"}
+FAQ_WITH_PHONE = {"faq_return", "faq_cantbuy"}
+FAQ_WITH_TICKET_BUTTON = {"faq_cantbuy"}
 
 
 FAQ_LIST_TEXT = "❓ Часто задаваемые вопросы\n\nВыбери вопрос:"
@@ -1002,7 +1002,7 @@ FAQ_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("Вернуть / обменять билет 🔄",  callback_data="faq_return")],
     [InlineKeyboardButton("Билеты не пришли на почту 📧", callback_data="faq_notreceived")],
     [InlineKeyboardButton("Купить билет в подарок 🎁",    callback_data="faq_gift")],
-    [InlineKeyboardButton("Не могу купить билет ❌",      callback_data="faq_cantbuy")],
+    [InlineKeyboardButton("Не могу купить билет ❌",      url=TICKET_URL)],
     [InlineKeyboardButton("Нужно ли печатать билет? 🖨",  callback_data="faq_print")],
 ])
 
@@ -1021,14 +1021,14 @@ async def cb_faq_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_answer_callback(query)
     key = query.data
     text = FAQ_ANSWERS.get(key, "Ответ не найден.")
-    if key in FAQ_WITH_CONTACT:
+    if key in FAQ_WITH_PHONE:
         text += f"\n\n{PHONE}"
     buttons = [
         [InlineKeyboardButton("← Назад к вопросам", callback_data="cb_faq")],
     ]
-    if key in FAQ_WITH_CONTACT:
+    if key in FAQ_WITH_TICKET_BUTTON:
         buttons.insert(0, [
-            InlineKeyboardButton("✈️ Написать в ТГ", url=f"https://t.me/{TG_USERNAME}"),
+            InlineKeyboardButton("✈️ Написать в ТГ", url=TICKET_URL),
         ])
     try:
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -1847,10 +1847,8 @@ def main():
         await db.init_db()
         await application.bot.set_my_commands([
             ("menu",          "Главное меню"),
-            ("exhibition",    "Выставка «Небо.Река» 🎨"),
-            ("map",           "Карта выставки 🗺"),
+            ("exhibition",    "Выставки «Дом Рождества»"),
             ("offers",        "Специальные предложения 💝"),
-            ("certificates",  "Подарочные сертификаты 🎁"),
             ("faq",           "Часто задаваемые вопросы ❓"),
             ("contact",       "Связаться с нами 📞"),
             ("review",        "Оставить отзыв ⭐️"),
