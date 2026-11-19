@@ -967,14 +967,6 @@ FAQ_ANSWERS = {
         "Если это не решило ситуацию, пожалуйста, обратитесь в нашу службу поддержки "
         "по номеру: +375 (44) 738 33 33"
     ),
-    "faq_gift": (
-        "Купить билет в подарок 🎁\n\n"
-        "У нас в кассе можно приобрести билет с открытой датой, "
-        "который мы упакуем в красивый подарочный конверт. "
-        "А также можно приобрести электронные билеты с открытой датой у нас на сайте: "
-        "https://dei-tickets.onrender.com/buy-tickets-smr"
-        "?utm_source=tg&utm_medium=banner&utm_campaign=podarochniesertifikaty"
-    ),
     "faq_cantbuy": (
         "Не могу купить билет ❌\n\n"
         "— Не работает ссылка?\n"
@@ -1001,7 +993,6 @@ FAQ_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("Где и как купить билет 🎟",     callback_data="faq_buy")],
     [InlineKeyboardButton("Вернуть / обменять билет 🔄",  callback_data="faq_return")],
     [InlineKeyboardButton("Билеты не пришли на почту 📧", callback_data="faq_notreceived")],
-    [InlineKeyboardButton("Купить билет в подарок 🎁",    callback_data="faq_gift")],
     [InlineKeyboardButton("Не могу купить билет ❌",      url=TICKET_URL)],
     [InlineKeyboardButton("Нужно ли печатать билет? 🖨",  callback_data="faq_print")],
 ])
